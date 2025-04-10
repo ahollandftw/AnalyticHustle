@@ -47,6 +47,7 @@ const navItems = {
     { title: "Daily Matchups", href: "/mlb/daily-matchups", icon: Calendar },
     { title: "HR Projections", href: "/mlb/hr-projections", icon: TrendingUp },
     { title: "HR Live Odds", href: "/mlb/hr-live-odds", icon: Zap },
+    { title: "HR Calculator", href: "/mlb/hr-calculator", icon: PieChart },
     { title: "Implied Totals", href: "/mlb/implied-totals", icon: TrendingUp },
     { title: "Park Factors", href: "/mlb/park-factors", icon: Stadium },
     { title: "Players", href: "/mlb/players", icon: Users },
