@@ -22,6 +22,8 @@ import { cn } from "@/lib/utils"
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import statcastPitchers from "../../../Data/StatcastPitchers.json"
 import statcastBatters from "@/data/StatcastBatters.json"
+import hittersVsR from "../../../Data/HittersvR.json"
+import hittersVsL from "../../../Data/HittersvL.json"
 
 interface StatcastPitcher {
   "last_name, first_name": string
@@ -60,21 +62,63 @@ interface StatcastBatter {
   [key: string]: any  // Allow for dynamic fields
 }
 
-type StatcastPlayer = StatcastPitcher | StatcastBatter
-
-type SortConfig = {
-  key: keyof StatcastPlayer | null
-  direction: 'asc' | 'desc'
+interface HitterVsR {
+  Name_1: string
+  Team_1: string
+  HR: number
+  PA: number
+  "FB%": number
+  "Pull%": number
+  "HR/FB": number
+  ISO: number
+  _year: number
+  [key: string]: any  // Allow dynamic access for sorting
 }
 
-const TABS = [
-  { id: 'statcastBatters', name: 'Statcast Batters', dataset: 'batters' },
-  { id: 'statcastPitchers', name: 'Statcast Pitchers', dataset: 'pitchers' },
+interface HitterVsL {
+  Name_1: string
+  Team_1: string
+  HR: number
+  PA: number
+  "FB%": number
+  "Pull%": number
+  "HR/FB": number
+  ISO: number
+  _year: number
+  [key: string]: any  // Allow dynamic access for sorting
+}
+
+type StatcastPlayer = StatcastPitcher | StatcastBatter
+
+type SortDirection = 'asc' | 'desc'
+
+type SortConfig = {
+  key: string | null
+  direction: SortDirection
+}
+
+const HITTERS_VS_R_COLUMNS = [
+  { key: "Name_1", label: "Name", width: "200px" },
+  { key: "Team_1", label: "Team", width: "80px" },
+  { key: "HR", label: "HR", width: "80px" },
+  { key: "PA", label: "PA", width: "80px" },
+  { key: "FB%", label: "FB%", width: "80px", format: (val: number) => (val * 100).toFixed(1) + '%' },
+  { key: "Pull%", label: "Pull%", width: "80px", format: (val: number) => (val * 100).toFixed(1) + '%' },
+  { key: "HR/FB", label: "HR/FB", width: "80px", format: (val: number) => (val * 100).toFixed(1) + '%' },
+  { key: "ISO", label: "ISO", width: "80px", format: (val: number) => val.toFixed(3) }
 ]
 
-const YEARS = ['2024', '2023']
+const HITTERS_VS_L_COLUMNS = [
+  { key: "Name_1", label: "Name", width: "200px" },
+  { key: "Team_1", label: "Team", width: "80px" },
+  { key: "HR", label: "HR", width: "80px" },
+  { key: "PA", label: "PA", width: "80px" },
+  { key: "FB%", label: "FB%", width: "80px", format: (val: number) => (val * 100).toFixed(1) + '%' },
+  { key: "Pull%", label: "Pull%", width: "80px", format: (val: number) => (val * 100).toFixed(1) + '%' },
+  { key: "HR/FB", label: "HR/FB", width: "80px", format: (val: number) => (val * 100).toFixed(1) + '%' },
+  { key: "ISO", label: "ISO", width: "80px", format: (val: number) => val.toFixed(3) }
+]
 
-// Define column configurations for each dataset
 const BATTER_COLUMNS = [
   { key: "last_name, first_name", label: "Name", width: "200px" },
   { key: "team_name_alt", label: "Team", width: "80px" },
@@ -119,69 +163,89 @@ const PITCHER_COLUMNS = [
   { key: "hard_hit_percent", label: "Hard Hit%", width: "90px", format: (val: number) => val?.toFixed(1) + '%' }
 ]
 
+const TABS = [
+  { label: "Statcast Batters", value: "batters", dataset: "batters", columns: BATTER_COLUMNS },
+  { label: "Statcast Pitchers", value: "pitchers", dataset: "pitchers", columns: PITCHER_COLUMNS },
+  { label: "Hitters vs R", value: "hittersVsR", dataset: "hittersVsR", columns: HITTERS_VS_R_COLUMNS },
+  { label: "Hitters vs L", value: "hittersVsL", dataset: "hittersVsL", columns: HITTERS_VS_L_COLUMNS }
+]
+
+const YEARS = ['2024', '2023', '2022']
+
 // Add type assertion for imported data
 const pitchersData = statcastPitchers as StatcastPitcher[]
 const battersData = statcastBatters as StatcastBatter[]
 
+type DataType = StatcastPlayer | HitterVsR | HitterVsL
+
 export default function PlayersPage() {
   const [searchTerm, setSearchTerm] = useState("")
+  const [selectedTeam, setSelectedTeam] = useState<string>("All Teams")
   const [selectedTab, setSelectedTab] = useState(TABS[0])
   const [selectedYear, setSelectedYear] = useState(YEARS[0])
-  const [selectedTeam, setSelectedTeam] = useState<string>("All Teams")
+  const [selectedPitch, setSelectedPitch] = useState<string>("All Pitches")
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: 'asc' })
 
   // Get the appropriate dataset based on selected tab
-  const baseData = selectedTab.dataset === 'batters' ? battersData : pitchersData
+  const baseData = selectedTab.dataset === 'batters' 
+    ? battersData 
+    : selectedTab.dataset === 'pitchers'
+    ? pitchersData
+    : selectedTab.dataset === 'hittersVsR'
+    ? hittersVsR as HitterVsR[]
+    : hittersVsL as HitterVsL[]
 
   // Get unique teams from the current dataset
-  const teams = ["All Teams", ...Array.from(new Set(baseData.map(player => player.team_name_alt))).sort()]
-
-  // Filter players based on search term
-  const data = baseData as StatcastPlayer[]
-  
-  // Debug logging for the first few players' specific fields
-  console.log('Detailed field inspection for first 3 players:')
-  data.slice(0, 3).forEach(player => {
-    console.log(`Player: ${player.player_name || player["last_name, first_name"]}`)
-    console.log('All keys:', Object.keys(player))
-    console.log('Full player data:', JSON.stringify(player, null, 2))
-  })
-  
-  // Filter players based on search term, year and team
-  let filteredPlayers = data.filter(player => {
-    // Only filter by name if search term is provided
-    const nameMatch = !searchTerm || (player["last_name, first_name"] && 
-      player["last_name, first_name"].toLowerCase().includes(searchTerm.toLowerCase()))
-    
-    // Filter by year using _year field
-    const yearMatch = player._year?.toString() === selectedYear
-
-    // Filter by team
-    const teamMatch = selectedTeam === "All Teams" || player.team_name_alt === selectedTeam
-    
-    return nameMatch && yearMatch && teamMatch
-  })
-
-  // Remove duplicate players (keep only one entry per player)
-  filteredPlayers = filteredPlayers.reduce((unique, player) => {
-    const exists = unique.find(p => p.player_id === player.player_id)
-    if (!exists) {
-      unique.push(player)
+  const teams = ["All Teams", ...Array.from(new Set(baseData.map(player => {
+    if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL') {
+      return (player as HitterVsR | HitterVsL).Team_1
     }
-    return unique
-  }, [] as StatcastPlayer[])
+    return (player as StatcastPlayer).team_name_alt
+  }))).sort()]
+
+  // Get unique pitch names for Statcast data
+  const pitchNames = ["All Pitches", ...Array.from(new Set(
+    (selectedTab.dataset === 'batters' ? battersData : pitchersData)
+      .map(player => player.pitch_name)
+  )).sort()]
+
+  // Filter players based on search term, year, team, and pitch
+  let filteredPlayers = baseData.filter(player => {
+    if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL') {
+      const hitter = player as HitterVsR | HitterVsL
+      const nameMatch = !searchTerm || hitter.Name_1?.toLowerCase().includes(searchTerm.toLowerCase())
+      const yearMatch = hitter._year?.toString() === selectedYear
+      const teamMatch = selectedTeam === "All Teams" || hitter.Team_1 === selectedTeam
+      return nameMatch && yearMatch && teamMatch
+    } else {
+      const statcastPlayer = player as StatcastPlayer
+      const nameMatch = !searchTerm || statcastPlayer["last_name, first_name"]?.toLowerCase().includes(searchTerm.toLowerCase())
+      const yearMatch = statcastPlayer._year?.toString() === selectedYear
+      const teamMatch = selectedTeam === "All Teams" || statcastPlayer.team_name_alt === selectedTeam
+      const pitchMatch = selectedPitch === "All Pitches" || statcastPlayer.pitch_name === selectedPitch
+      return nameMatch && yearMatch && teamMatch && pitchMatch
+    }
+  })
 
   // Sort players if sort config is set
-  if (sortConfig.key) {
-    filteredPlayers = [...filteredPlayers].sort((a, b) => {
-      const aValue = a[sortConfig.key!]
-      const bValue = b[sortConfig.key!]
-      
-      // Handle undefined values in sorting
-      if (aValue === undefined && bValue === undefined) return 0
-      if (aValue === undefined) return 1
-      if (bValue === undefined) return -1
-      
+  if (sortConfig && sortConfig.key) {
+    filteredPlayers.sort((a, b) => {
+      let aValue: any, bValue: any
+
+      if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL') {
+        aValue = (a as HitterVsR | HitterVsL)[sortConfig.key as keyof HitterVsR | keyof HitterVsL]
+        bValue = (b as HitterVsR | HitterVsL)[sortConfig.key as keyof HitterVsR | keyof HitterVsL]
+      } else {
+        aValue = (a as StatcastPlayer)[sortConfig.key as keyof StatcastPlayer]
+        bValue = (b as StatcastPlayer)[sortConfig.key as keyof StatcastPlayer]
+      }
+
+      // Handle numeric values
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue
+      }
+
+      // Handle string values
       if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1
       if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1
       return 0
@@ -190,17 +254,17 @@ export default function PlayersPage() {
 
   // Debug logging to check year filtering
   console.log('Selected year:', selectedYear)
-  console.log('Sample player years:', data.slice(0, 5).map(p => p._year))
+  console.log('Sample player years:', baseData.slice(0, 5).map(p => p._year))
   console.log('Players after year filtering:', filteredPlayers.length)
 
-  const handleSort = (key: keyof StatcastPlayer) => {
+  const handleSort = (key: string) => {
     setSortConfig(current => ({
       key,
       direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
     }))
   }
 
-  const SortIcon = ({ columnKey }: { columnKey: keyof StatcastPlayer }) => {
+  const SortIcon = ({ columnKey }: { columnKey: string }) => {
     if (sortConfig.key !== columnKey) return <ArrowUpDown className="ml-1 h-4 w-4 inline" />
     return sortConfig.direction === 'asc' 
       ? <ArrowUp className="ml-1 h-4 w-4 inline" />
@@ -208,11 +272,11 @@ export default function PlayersPage() {
   }
 
   // Get columns based on selected tab
-  const columns = selectedTab.dataset === 'batters' ? BATTER_COLUMNS : PITCHER_COLUMNS
+  const columns = selectedTab.columns
 
   // Get available years based on the selected dataset
   const getYearsForDataset = () => {
-    return ['2024', '2023']
+    return ['2024', '2023', '2022']
   }
 
   // Update years when tab changes
@@ -228,8 +292,13 @@ export default function PlayersPage() {
     setSelectedTeam("All Teams")
   }, [selectedTab])
 
+  // Reset pitch selection when changing tabs
+  useEffect(() => {
+    setSelectedPitch("All Pitches")
+  }, [selectedTab])
+
   // If no data is loaded yet, show loading state
-  if (!data || data.length === 0) {
+  if (!baseData || baseData.length === 0) {
     return (
       <div className="p-4">
         <h1 className="text-2xl font-bold">MLB Players</h1>
@@ -239,101 +308,114 @@ export default function PlayersPage() {
   }
 
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold">MLB Players</h1>
-            <span className="text-sm text-muted-foreground">
-              {filteredPlayers.length} players found
-            </span>
-            </div>
-          <div className="flex items-center gap-4">
-            <Select
-              value={selectedYear}
-              onValueChange={setSelectedYear}
-            >
-              <SelectTrigger className="w-[100px]">
-                <SelectValue placeholder="Year" />
-              </SelectTrigger>
-              <SelectContent>
-                {getYearsForDataset().map(year => (
-                  <SelectItem key={year} value={year}>
-                    {year}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={selectedTeam}
-              onValueChange={setSelectedTeam}
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue placeholder="Select Team" />
-              </SelectTrigger>
-              <SelectContent>
-                {teams.map(team => (
-                  <SelectItem key={team} value={team}>
-                    {team}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-                <Input
-                  placeholder="Search players..."
-              className="w-[200px] md:w-[300px]"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-
-        <div className="flex gap-1 border-b">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setSelectedTab(tab)}
-              className={cn(
-                "px-6 py-3 text-sm font-medium transition-colors hover:bg-muted/50 rounded-t-lg -mb-px",
-                selectedTab.id === tab.id
-                  ? "border-2 border-b-0 border-border bg-background"
-                  : "border border-transparent"
-              )}
-            >
-              {tab.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <Card className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-              {columns.map((column) => (
-                <TableHead
-                  key={column.key}
-                  className="text-center cursor-pointer hover:bg-muted/50"
-                  style={{ width: column.width }}
-                  onClick={() => handleSort(column.key as keyof StatcastPlayer)}
+    <div className="p-4">
+      <Card>
+        <div className="border-b border-border">
+          <div className="flex items-center justify-between p-4">
+            <div className="flex gap-4">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.value}
+                  onClick={() => setSelectedTab(tab)}
+                  className={cn(
+                    "px-6 py-3 text-sm font-medium transition-colors hover:bg-muted/50 rounded-t-lg -mb-px",
+                    selectedTab.value === tab.value
+                      ? "border-2 border-b-0 border-border bg-background"
+                      : "border border-transparent"
+                  )}
                 >
-                  {column.label} <SortIcon columnKey={column.key as keyof StatcastPlayer} />
-                        </TableHead>
+                  {tab.label}
+                </button>
               ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-            {filteredPlayers.map((player) => (
-              <TableRow key={player.player_id}>
-                {columns.map((column) => (
-                  <TableCell key={column.key} className="text-center">
-                    {column.format ? column.format(player[column.key]) : player[column.key]}
-                  </TableCell>
-                ))}
-                    </TableRow>
+            </div>
+            <div className="flex items-center gap-4">
+              <Select
+                value={selectedYear}
+                onValueChange={setSelectedYear}
+              >
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {YEARS.map(year => (
+                    <SelectItem key={year} value={year}>
+                      {year}
+                    </SelectItem>
                   ))}
-                </TableBody>
-              </Table>
+                </SelectContent>
+              </Select>
+              {selectedTab.dataset !== 'hittersVsR' && (
+                <Select
+                  value={selectedPitch}
+                  onValueChange={setSelectedPitch}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select Pitch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pitchNames.map(pitch => (
+                      <SelectItem key={pitch} value={pitch}>
+                        {pitch}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Select
+                value={selectedTeam}
+                onValueChange={setSelectedTeam}
+              >
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Select Team" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teams.map(team => (
+                    <SelectItem key={team} value={team}>
+                      {team}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Search players..."
+                className="w-[200px] md:w-[300px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="relative w-full overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {columns.map((column) => (
+                  <TableHead
+                    key={column.key}
+                    className="text-center cursor-pointer hover:bg-muted/50"
+                    style={{ width: column.width }}
+                    onClick={() => handleSort(column.key)}
+                  >
+                    {column.label} <SortIcon columnKey={column.key} />
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredPlayers.map((player, idx) => (
+                <TableRow key={idx}>
+                  {columns.map((column) => (
+                    <TableCell key={column.key} className="text-center">
+                      {column.format 
+                        ? column.format(player[column.key])
+                        : player[column.key]}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
     </div>
   )
