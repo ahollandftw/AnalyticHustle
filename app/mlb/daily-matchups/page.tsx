@@ -93,7 +93,7 @@ export default function DailyMatchupsPage() {
   const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-    } else {
+        } else {
       setSortField(field)
       setSortDirection("desc")
     }
@@ -127,7 +127,7 @@ export default function DailyMatchupsPage() {
 
               <div className="grid gap-8 md:grid-cols-2">
                 {/* Away Team */}
-                <div>
+                          <div>
                   <h4 className="mb-2 font-medium">{game.awayTeam.name} Lineup</h4>
                   <Table>
                     <TableHeader>
@@ -159,10 +159,10 @@ export default function DailyMatchupsPage() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
+                    </div>
 
                 {/* Home Team */}
-                <div>
+                    <div>
                   <h4 className="mb-2 font-medium">{game.homeTeam.name} Lineup</h4>
                   <Table>
                     <TableHeader>
@@ -194,8 +194,8 @@ export default function DailyMatchupsPage() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
-              </div>
+                    </div>
+                  </div>
             </div>
           ))}
         </CardContent>
