@@ -25,6 +25,9 @@ import statcastBatters from "@/data/StatcastBatters.json"
 import hittersVsR from "../../../Data/HittersvR.json"
 import hittersVsL from "../../../Data/HittersvL.json"
 import pitchersVsR from "../../../Data/PitchersvR.json"
+import pitchersVsL from "../../../Data/PitchersvL.json"
+import evBatters from "@/Data/EVBatters.json"
+import evPitchers from "@/Data/EVPitchers.json"
 
 interface StatcastPitcher {
   "last_name, first_name": string
@@ -101,6 +104,50 @@ interface PitcherVsR {
   [key: string]: any  // Allow dynamic access for sorting
 }
 
+interface PitcherVsL {
+  Name_1: string
+  Team_1: string
+  HR: number
+  "HR/9": number
+  "FB%": number
+  "GB%": number
+  PlayerId: number
+  _year: number
+  [key: string]: any  // Allow dynamic access for sorting
+}
+
+interface EVBatter {
+  "last_name, first_name": string
+  player_id: number
+  attempts: number
+  avg_hit_angle: number
+  anglesweetspotpercent: number
+  max_hit_speed: number
+  avg_hit_speed: number
+  ev95percent: number
+  brl_percent: number
+  brl_pa: number
+  avg_distance: number
+  avg_hr_distance: number
+  [key: string]: any
+}
+
+interface EVPitcher {
+  "last_name, first_name": string
+  player_id: number
+  attempts: number
+  avg_hit_angle: number
+  anglesweetspotpercent: number
+  max_hit_speed: number
+  avg_hit_speed: number
+  ev95percent: number
+  brl_percent: number
+  brl_pa: number
+  avg_distance: number
+  avg_hr_distance: number
+  [key: string]: any
+}
+
 type StatcastPlayer = StatcastPitcher | StatcastBatter
 
 type SortDirection = 'asc' | 'desc'
@@ -133,6 +180,15 @@ const HITTERS_VS_L_COLUMNS = [
 ]
 
 const PITCHERS_VS_R_COLUMNS = [
+  { key: "Name_1", label: "Name", width: "200px" },
+  { key: "Team_1", label: "Team", width: "80px" },
+  { key: "HR", label: "HR", width: "80px" },
+  { key: "HR/9", label: "HR/9", width: "80px", format: (val: number) => val.toFixed(2) },
+  { key: "FB%", label: "FB%", width: "80px", format: (val: number) => (val * 100).toFixed(1) + '%' },
+  { key: "GB%", label: "GB%", width: "80px", format: (val: number) => (val * 100).toFixed(1) + '%' }
+]
+
+const PITCHERS_VS_L_COLUMNS = [
   { key: "Name_1", label: "Name", width: "200px" },
   { key: "Team_1", label: "Team", width: "80px" },
   { key: "HR", label: "HR", width: "80px" },
@@ -185,12 +241,43 @@ const PITCHER_COLUMNS = [
   { key: "hard_hit_percent", label: "Hard Hit%", width: "90px", format: (val: number) => val?.toFixed(1) + '%' }
 ]
 
+const EV_BATTERS_COLUMNS = [
+  { key: "last_name, first_name", label: "Name", width: "200px" },
+  { key: "attempts", label: "PA", width: "80px" },
+  { key: "avg_hit_angle", label: "Launch Angle", width: "100px", format: (val: number) => val?.toFixed(1) },
+  { key: "anglesweetspotpercent", label: "Sweet Spot%", width: "100px", format: (val: number) => val?.toFixed(1) + '%' },
+  { key: "avg_hit_speed", label: "Exit Velo", width: "90px", format: (val: number) => val?.toFixed(1) },
+  { key: "max_hit_speed", label: "Max EV", width: "90px", format: (val: number) => val?.toFixed(1) },
+  { key: "ev95percent", label: "95+ EV%", width: "90px", format: (val: number) => val?.toFixed(1) + '%' },
+  { key: "brl_percent", label: "Barrel%", width: "90px", format: (val: number) => val?.toFixed(1) + '%' },
+  { key: "brl_pa", label: "Brl/PA", width: "90px", format: (val: number) => val?.toFixed(1) + '%' },
+  { key: "avg_distance", label: "Avg Dist", width: "90px", format: (val: number) => val?.toFixed(0) },
+  { key: "avg_hr_distance", label: "Avg HR Dist", width: "100px", format: (val: number) => val?.toFixed(0) }
+]
+
+const EV_PITCHERS_COLUMNS = [
+  { key: "last_name, first_name", label: "Name", width: "200px" },
+  { key: "attempts", label: "BIP", width: "80px" },
+  { key: "avg_hit_angle", label: "Launch Angle", width: "100px", format: (val: number) => val?.toFixed(1) },
+  { key: "anglesweetspotpercent", label: "Sweet Spot%", width: "100px", format: (val: number) => val?.toFixed(1) + '%' },
+  { key: "avg_hit_speed", label: "Exit Velo", width: "90px", format: (val: number) => val?.toFixed(1) },
+  { key: "max_hit_speed", label: "Max EV", width: "90px", format: (val: number) => val?.toFixed(1) },
+  { key: "ev95percent", label: "95+ EV%", width: "90px", format: (val: number) => val?.toFixed(1) + '%' },
+  { key: "brl_percent", label: "Barrel%", width: "90px", format: (val: number) => val?.toFixed(1) + '%' },
+  { key: "brl_pa", label: "Brl/PA", width: "90px", format: (val: number) => val?.toFixed(1) + '%' },
+  { key: "avg_distance", label: "Avg Dist", width: "90px", format: (val: number) => val?.toFixed(0) },
+  { key: "avg_hr_distance", label: "Avg HR Dist", width: "100px", format: (val: number) => val?.toFixed(0) }
+]
+
 const TABS = [
   { label: "Statcast Batters", value: "batters", dataset: "batters", columns: BATTER_COLUMNS },
   { label: "Statcast Pitchers", value: "pitchers", dataset: "pitchers", columns: PITCHER_COLUMNS },
   { label: "Hitters vs R", value: "hittersVsR", dataset: "hittersVsR", columns: HITTERS_VS_R_COLUMNS },
   { label: "Hitters vs L", value: "hittersVsL", dataset: "hittersVsL", columns: HITTERS_VS_L_COLUMNS },
-  { label: "Pitchers vs R", value: "pitchersVsR", dataset: "pitchersVsR", columns: PITCHERS_VS_R_COLUMNS }
+  { label: "Pitchers vs R", value: "pitchersVsR", dataset: "pitchersVsR", columns: PITCHERS_VS_R_COLUMNS },
+  { label: "Pitchers vs L", value: "pitchersVsL", dataset: "pitchersVsL", columns: PITCHERS_VS_L_COLUMNS },
+  { label: "EV Batters", value: "evBatters", dataset: "evBatters", columns: EV_BATTERS_COLUMNS },
+  { label: "EV Pitchers", value: "evPitchers", dataset: "evPitchers", columns: EV_PITCHERS_COLUMNS }
 ]
 
 const YEARS = ['2024', '2023', '2022']
@@ -198,8 +285,10 @@ const YEARS = ['2024', '2023', '2022']
 // Add type assertion for imported data
 const pitchersData = statcastPitchers as StatcastPitcher[]
 const battersData = statcastBatters as StatcastBatter[]
+const evBattersData = evBatters as EVBatter[]
+const evPitchersData = evPitchers as EVPitcher[]
 
-type DataType = StatcastPlayer | HitterVsR | HitterVsL | PitcherVsR
+type DataType = StatcastPlayer | HitterVsR | HitterVsL | PitcherVsR | PitcherVsL | EVBatter | EVPitcher
 
 export default function PlayersPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -218,12 +307,18 @@ export default function PlayersPage() {
     ? hittersVsR as HitterVsR[]
     : selectedTab.dataset === 'hittersVsL'
     ? hittersVsL as HitterVsL[]
+    : selectedTab.dataset === 'pitchersVsL'
+    ? pitchersVsL as PitcherVsL[]
+    : selectedTab.dataset === 'evBatters'
+    ? evBattersData
+    : selectedTab.dataset === 'evPitchers'
+    ? evPitchersData
     : pitchersVsR as PitcherVsR[]
 
   // Get unique teams from the current dataset
   const teams = ["All Teams", ...Array.from(new Set(baseData.map(player => {
-    if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL' || selectedTab.dataset === 'pitchersVsR') {
-      return (player as HitterVsR | HitterVsL | PitcherVsR).Team_1
+    if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL' || selectedTab.dataset === 'pitchersVsR' || selectedTab.dataset === 'pitchersVsL') {
+      return (player as HitterVsR | HitterVsL | PitcherVsR | PitcherVsL).Team_1
     }
     return (player as StatcastPlayer).team_name_alt
   }))).sort()]
@@ -236,12 +331,17 @@ export default function PlayersPage() {
 
   // Filter players based on search term, year, team, and pitch
   let filteredPlayers = baseData.filter(player => {
-    if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL' || selectedTab.dataset === 'pitchersVsR') {
-      const vsPlayer = player as HitterVsR | HitterVsL | PitcherVsR
+    if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL' || selectedTab.dataset === 'pitchersVsR' || selectedTab.dataset === 'pitchersVsL') {
+      const vsPlayer = player as HitterVsR | HitterVsL | PitcherVsR | PitcherVsL
       const nameMatch = !searchTerm || vsPlayer.Name_1?.toLowerCase().includes(searchTerm.toLowerCase())
       const yearMatch = vsPlayer._year?.toString() === selectedYear
       const teamMatch = selectedTeam === "All Teams" || vsPlayer.Team_1 === selectedTeam
       return nameMatch && yearMatch && teamMatch
+    } else if (selectedTab.dataset === 'evBatters' || selectedTab.dataset === 'evPitchers') {
+      const evPlayer = player as EVBatter | EVPitcher
+      const nameMatch = !searchTerm || evPlayer["last_name, first_name"]?.toLowerCase().includes(searchTerm.toLowerCase())
+      const teamMatch = true
+      return nameMatch && teamMatch
     } else {
       const statcastPlayer = player as StatcastPlayer
       const nameMatch = !searchTerm || statcastPlayer["last_name, first_name"]?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -257,9 +357,9 @@ export default function PlayersPage() {
     filteredPlayers.sort((a, b) => {
       let aValue: any, bValue: any
 
-      if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL' || selectedTab.dataset === 'pitchersVsR') {
-        aValue = (a as HitterVsR | HitterVsL | PitcherVsR)[sortConfig.key as keyof HitterVsR | keyof HitterVsL | keyof PitcherVsR]
-        bValue = (b as HitterVsR | HitterVsL | PitcherVsR)[sortConfig.key as keyof HitterVsR | keyof HitterVsL | keyof PitcherVsR]
+      if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL' || selectedTab.dataset === 'pitchersVsR' || selectedTab.dataset === 'pitchersVsL') {
+        aValue = (a as HitterVsR | HitterVsL | PitcherVsR | PitcherVsL)[sortConfig.key as keyof HitterVsR | keyof HitterVsL | keyof PitcherVsR | keyof PitcherVsL]
+        bValue = (b as HitterVsR | HitterVsL | PitcherVsR | PitcherVsL)[sortConfig.key as keyof HitterVsR | keyof HitterVsL | keyof PitcherVsR | keyof PitcherVsL]
       } else {
         aValue = (a as StatcastPlayer)[sortConfig.key as keyof StatcastPlayer]
         bValue = (b as StatcastPlayer)[sortConfig.key as keyof StatcastPlayer]
@@ -281,6 +381,8 @@ export default function PlayersPage() {
   console.log('Selected year:', selectedYear)
   console.log('Sample player years:', baseData.slice(0, 5).map(p => p._year))
   console.log('Players after year filtering:', filteredPlayers.length)
+  console.log('EV Batters data sample:', evBattersData.slice(0, 3))
+  console.log('EV Batters total count:', evBattersData.length)
 
   const handleSort = (key: string) => {
     setSortConfig(current => ({

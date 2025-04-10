@@ -9,9 +9,7 @@ interface HitterStats {
   FlyBallRate: number
   PullRate: number
   HR_FB_Rate: number
-  xHR: number
   ISO: number
-  RecentHRs: number
 }
 
 interface PitcherStats {
@@ -29,9 +27,7 @@ interface Weights {
   FlyBallRate: number
   PullRate: number
   HR_FB_Rate: number
-  xHR: number
   ISO: number
-  RecentHRs: number
   PitcherHR_9: number
   PitcherBarrelRate: number
   PitcherFBRate: number
@@ -54,9 +50,7 @@ function calculateHRProbability(
     FlyBallRate: hitter.FlyBallRate / 100,
     PullRate: hitter.PullRate / 100,
     HR_FB_Rate: hitter.HR_FB_Rate / 100,
-    xHR: hitter.xHR / 50, // Assuming max xHR of 50
     ISO: hitter.ISO / 0.300, // Assuming max ISO of .300
-    RecentHRs: hitter.RecentHRs / 10, // Assuming looking at last 10 games
     PitcherHR_9: pitcher.PitcherHR_9 / 3, // Normalize around league average
     PitcherBarrelRate: pitcher.PitcherBarrelRate / 100,
     PitcherFBRate: pitcher.PitcherFBRate / 100,
