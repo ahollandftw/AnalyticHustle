@@ -53,32 +53,27 @@ export default function RootLayout({
   const pathname = usePathname()
 
   return (
-    <html lang="en">
+    <html lang="en" className="h-full">
       <head>
         <title>Analytic Hustle - MLB Analytics & Insights</title>
         <meta name="description" content="Your premier destination for MLB analytics and insights" />
         <link rel="icon" href="/logo.svg" />
       </head>
-      <body className={inter.className}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
+      <body className={cn(inter.className, "h-full bg-[#0A0C10]")}>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           <AuthProvider>
             <TeamColorProvider>
               <NotificationProvider>
                 <SidebarProvider>
-                  <div className="min-h-screen bg-background">
-                    <div className="flex items-center justify-between p-4 border-b">
+                  <div className="fixed inset-0 flex flex-col">
+                    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border/40 bg-[#0A0C10] px-4">
                       <div className="flex items-center gap-6">
                         <Link href="/" className="flex items-center gap-2">
                           <Image
                             src="/logo.svg"
                             alt="Analytic Hustle"
-                            width={40}
-                            height={40}
+                            width={32}
+                            height={32}
                             priority
                           />
                           <span className="text-xl font-bold">Analytic Hustle</span>
@@ -103,10 +98,12 @@ export default function RootLayout({
                         </nav>
                       </div>
                       <TopNavigation />
-                    </div>
-                    <div className="flex">
+                    </header>
+                    <div className="flex flex-1 overflow-hidden">
                       <MainSidebar />
-                      <main className="flex-1 p-6">{children}</main>
+                      <main className="flex-1 overflow-auto p-6">
+                        {children}
+                      </main>
                     </div>
                   </div>
                 </SidebarProvider>
