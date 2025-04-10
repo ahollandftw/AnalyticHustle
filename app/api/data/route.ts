@@ -1,77 +1,126 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { promises as fs } from 'fs'
-import path from 'path'
+import { promises as fs } from "fs"
+import path from "path"
+import { cache } from "react"
 
-// Helper function to normalize player names
-function normalizeName(name: string) {
-  // Check if name is in "Last, First" format
-  if (name.includes(",")) {
-    const [lastName, firstName] = name.split(",").map((part) => part.trim())
-    return `${firstName} ${lastName}`
-  }
-  return name
+// Cache the file reading operation
+const readJsonFile = cache(async (filename: string) => {
+  const filePath = path.join(process.cwd(), "data", filename)
+  const data = await fs.readFile(filePath, "utf-8")
+  return JSON.parse(data)
+})
+
+// Helper to merge duplicate player entries
+function mergeDuplicatePlayers(players: any[]) {
+  const playerMap = new Map()
+  
+  players.forEach(player => {
+    const key = `${player.name}-${player.team}`.toLowerCase()
+    if (playerMap.has(key)) {
+      // Merge stats, taking the most recent or highest value
+      const existing = playerMap.get(key)
+      playerMap.set(key, {
+        ...existing,
+        ...player,
+        // Add any specific stat merging logic here
+        stats: {
+          ...existing.stats,
+          ...player.stats
+        }
+      })
+    } else {
+      playerMap.set(key, player)
+    }
+  })
+
+  return Array.from(playerMap.values())
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
-    const dataType = searchParams.get("type") || "players"
-    const sport = searchParams.get("sport") || "mlb"
-    const year = searchParams.get("year") || "2023"
+    const { searchParams } = new URL(request.url)
+    const type = searchParams.get("type")
+    const sport = searchParams.get("sport")?.toLowerCase() || "mlb"
 
-    let data
-    const dataDir = path.join(process.cwd(), 'Data')
-
-    if (dataType === "players" && sport === "mlb") {
-      // Load batter data
-      const batterFile = path.join(dataDir, 'StatcastBatter2.json')
-      const batterData = await fs.readFile(batterFile, 'utf8')
-      data = JSON.parse(batterData)
-    } else if (dataType === "pitchers" && sport === "mlb") {
-      // Load pitcher data
-      const pitcherFile = path.join(dataDir, 'StatcastPitcher2.json')
-      const pitcherData = await fs.readFile(pitcherFile, 'utf8')
-      data = JSON.parse(pitcherData)
-    } else if (dataType === "parkFactors" && sport === "mlb") {
-      // Load park factors data
-      const parkFile = path.join(dataDir, 'ParkFactors.json')
-      const parkData = await fs.readFile(parkFile, 'utf8')
-      data = JSON.parse(parkData)
-    } else if (dataType === "hittersvL" && sport === "mlb") {
-      const vsLFile = path.join(dataDir, 'HittersvL.json')
-      const vsLData = await fs.readFile(vsLFile, 'utf8')
-      data = JSON.parse(vsLData)
-    } else if (dataType === "hittersvR" && sport === "mlb") {
-      const vsRFile = path.join(dataDir, 'HittersvR.json')
-      const vsRData = await fs.readFile(vsRFile, 'utf8')
-      data = JSON.parse(vsRData)
-    } else if (dataType === "pitchersvR" && sport === "mlb") {
-      const vsRFile = path.join(dataDir, 'PitchersvR.json')
-      const vsRData = await fs.readFile(vsRFile, 'utf8')
-      data = JSON.parse(vsRData)
-    } else if (dataType === "evBatters" && sport === "mlb") {
-      const evFile = path.join(dataDir, 'EVBatters.json')
-      const evData = await fs.readFile(evFile, 'utf8')
-      data = JSON.parse(evData)
-    } else if (dataType === "evPitchers" && sport === "mlb") {
-      const evFile = path.join(dataDir, 'EVPitchers.json')
-      const evData = await fs.readFile(evFile, 'utf8')
-      data = JSON.parse(evData)
-    } else {
-      return NextResponse.json({ error: "Data not found" }, { status: 404 })
+    if (!type) {
+      return NextResponse.json({ error: "Type parameter is required" }, { status: 400 })
     }
 
-    // Normalize player names if needed
-    if (["players", "pitchers", "hittersvL", "hittersvR", "pitchersvR", "evBatters", "evPitchers"].includes(dataType)) {
-      data = data.map((player: any) => ({
-        ...player,
-        name: normalizeName(player.name),
-      }))
+    let data: any = null
+
+    switch (type) {
+      case "batters":
+        if (sport === "mlb") {
+          const statcastData = await readJsonFile("StatcastBatter2.json")
+          const vsLData = await readJsonFile("HittersvL.json")
+          const vsRData = await readJsonFile("HittersvR.json")
+          const evData = await readJsonFile("EVBatters.json")
+          
+          // Merge all batter data
+          data = mergeDuplicatePlayers([
+            ...statcastData,
+            ...vsLData,
+            ...vsRData,
+            ...evData
+          ])
+        }
+        break
+
+      case "pitchers":
+        if (sport === "mlb") {
+          const statcastData = await readJsonFile("StatcastPitcher2.json")
+          const vsRData = await readJsonFile("PitchersvR.json")
+          const evData = await readJsonFile("EVPitchers.json")
+          
+          // Merge all pitcher data
+          data = mergeDuplicatePlayers([
+            ...statcastData,
+            ...vsRData,
+            ...evData
+          ])
+        }
+        break
+
+      case "parkfactors":
+        if (sport === "mlb") {
+          try {
+            data = await readJsonFile("ParkFactors.json")
+            console.log("Park factors data loaded:", {
+              count: Array.isArray(data) ? data.length : 0,
+              sample: Array.isArray(data) ? data[0] : null
+            })
+          } catch (error) {
+            console.error("Error loading park factors:", error)
+            throw error
+          }
+        }
+        break
+
+      case "lineups":
+        // This will be empty for now as mentioned
+        data = []
+        break
+
+      case "games":
+        // This will be empty for now as mentioned
+        data = []
+        break
+
+      default:
+        return NextResponse.json({ error: "Invalid type parameter" }, { status: 400 })
     }
 
-    return NextResponse.json({ data })
+    if (!data) {
+      return NextResponse.json({ error: "No data found" }, { status: 404 })
+    }
+
+    return NextResponse.json(data)
+
   } catch (error) {
-    console.error("Error fetching data:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Error processing data request:", error)
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    )
   }
 }

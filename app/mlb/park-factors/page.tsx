@@ -1,278 +1,253 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react"
+import { useData } from "@/lib/hooks/use-data"
+import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Skeleton } from "@/components/ui/skeleton"
 
-// Mock data for park factors
-const parkFactorsData = [
-  {
-    id: 1,
-    name: "Yankee Stadium",
-    team: "New York Yankees",
-    parkFactor: 105,
-    wOBACon: 0.385,
-    BACON: 0.32,
-    hardHitPct: 38.5,
-    R: 850,
-    H: 1350,
-    HR: 220,
-    BB: 550,
-    SO: 1450,
-  },
-  {
-    id: 2,
-    name: "Fenway Park",
-    team: "Boston Red Sox",
-    parkFactor: 107,
-    wOBACon: 0.39,
-    BACON: 0.325,
-    hardHitPct: 39.2,
-    R: 870,
-    H: 1380,
-    HR: 190,
-    BB: 530,
-    SO: 1400,
-  },
-  {
-    id: 3,
-    name: "Dodger Stadium",
-    team: "Los Angeles Dodgers",
-    parkFactor: 98,
-    wOBACon: 0.365,
-    BACON: 0.31,
-    hardHitPct: 36.8,
-    R: 780,
-    H: 1320,
-    HR: 175,
-    BB: 520,
-    SO: 1500,
-  },
-  {
-    id: 4,
-    name: "Wrigley Field",
-    team: "Chicago Cubs",
-    parkFactor: 104,
-    wOBACon: 0.38,
-    BACON: 0.318,
-    hardHitPct: 38.0,
-    R: 830,
-    H: 1340,
-    HR: 210,
-    BB: 540,
-    SO: 1470,
-  },
-  {
-    id: 5,
-    name: "Oracle Park",
-    team: "San Francisco Giants",
-    parkFactor: 95,
-    wOBACon: 0.355,
-    BACON: 0.305,
-    hardHitPct: 35.5,
-    R: 750,
-    H: 1300,
-    HR: 150,
-    BB: 510,
-    SO: 1520,
-  },
-  {
-    id: 6,
-    name: "Coors Field",
-    team: "Colorado Rockies",
-    parkFactor: 115,
-    wOBACon: 0.41,
-    BACON: 0.335,
-    hardHitPct: 41.0,
-    R: 920,
-    H: 1420,
-    HR: 240,
-    BB: 560,
-    SO: 1380,
-  },
-]
+interface RawParkFactor {
+  "Rk.": number
+  Team: string
+  Venue: string
+  Year: string | number
+  "Park Factor": number
+  wOBACon: number
+  xwOBACon: number
+  BACON: number
+  xBACON: number
+  HardHit: number
+  R: number
+  OBP: number
+  H: number
+  "1B": number
+  "2B": number
+  "3B": number
+  HR: number
+  BB: number
+  SO: number
+  PA: number
+}
 
-type SortConfig = {
-  key: keyof (typeof parkFactorsData)[0]
-  direction: "asc" | "desc"
+interface ParkFactor {
+  rank: number
+  team: string
+  venue: string
+  year: string
+  parkFactor: number
+  wOBACon: number
+  xwOBACon: number
+  BACON: number
+  xBACON: number
+  hardHit: number
+  runs: number
+  obp: number
+  hits: number
+  singles: number
+  doubles: number
+  triples: number
+  hr: number
+  bb: number
+  so: number
+  pa: number
 }
 
 export default function ParkFactorsPage() {
-  const [year, setYear] = useState("2023")
-  const [sortConfig, setSortConfig] = useState<SortConfig>({
-    key: "parkFactor",
-    direction: "desc",
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedYear, setSelectedYear] = useState<string>("all")
+  const { data: rawData, loading, error } = useData<RawParkFactor[]>({ 
+    type: "parkfactors",
+    sport: "mlb"
   })
 
-  const handleSort = (key: keyof (typeof parkFactorsData)[0]) => {
-    setSortConfig((prev) => ({
-      key,
-      direction: prev.key === key && prev.direction === "desc" ? "asc" : "desc",
+  // Debug logs
+  useEffect(() => {
+    console.log("Raw data:", rawData)
+    console.log("Loading:", loading)
+    console.log("Error:", error)
+  }, [rawData, loading, error])
+
+  // Get unique years from the data
+  const years = Array.from(new Set((rawData || [])
+    .map(park => park?.Year)
+    .filter((year): year is string | number => year != null && year !== '')
+    .map(year => String(year))))
+    .sort()
+    .reverse()
+
+  // Debug log for years
+  useEffect(() => {
+    console.log("Available years:", years)
+  }, [years])
+
+  // Transform the raw data to match our interface
+  const parkFactors: ParkFactor[] = (rawData || [])
+    .filter(park => park && typeof park === 'object' && 'Team' in park && 'Venue' in park)
+    .map(park => ({
+      rank: Number(park["Rk."]) || 0,
+      team: (park.Team || '').trim(),
+      venue: park.Venue || '',
+      year: String(park.Year || ''),
+      parkFactor: Number(park["Park Factor"]) || 0,
+      wOBACon: Number(park.wOBACon) || 0,
+      xwOBACon: Number(park.xwOBACon) || 0,
+      BACON: Number(park.BACON) || 0,
+      xBACON: Number(park.xBACON) || 0,
+      hardHit: Number(park.HardHit) || 0,
+      runs: Number(park.R) || 0,
+      obp: Number(park.OBP) || 0,
+      hits: Number(park.H) || 0,
+      singles: Number(park["1B"]) || 0,
+      doubles: Number(park["2B"]) || 0,
+      triples: Number(park["3B"]) || 0,
+      hr: Number(park.HR) || 0,
+      bb: Number(park.BB) || 0,
+      so: Number(park.SO) || 0,
+      pa: Number(park.PA) || 0
     }))
-  }
 
-  const sortedData = [...parkFactorsData].sort((a, b) => {
-    if (sortConfig.direction === "asc") {
-      return a[sortConfig.key] > b[sortConfig.key] ? 1 : -1
-    } else {
-      return a[sortConfig.key] < b[sortConfig.key] ? 1 : -1
-    }
-  })
+  // Debug log for transformed data
+  useEffect(() => {
+    console.log("Transformed park factors:", parkFactors)
+  }, [parkFactors])
 
-  const getValueColor = (key: string, value: number) => {
-    // Different metrics have different scales for what's considered high/low
-    if (key === "parkFactor") {
-      if (value > 105) return "text-red-500"
-      if (value < 95) return "text-blue-500"
-    } else if (key === "wOBACon" || key === "BACON") {
-      if (value > 0.38) return "text-red-500"
-      if (value < 0.31) return "text-blue-500"
-    } else if (key === "hardHitPct") {
-      if (value > 38) return "text-red-500"
-      if (value < 36) return "text-blue-500"
-    } else if (key === "HR" || key === "R") {
-      if (value > 200) return "text-red-500"
-      if (value < 170) return "text-blue-500"
-    } else if (key === "SO") {
-      if (value > 1500) return "text-red-500"
-      if (value < 1400) return "text-blue-500"
-    }
-    return ""
-  }
+  // Filter based on both year and search term
+  const filteredParks = parkFactors
+    .filter(park => selectedYear === "all" || park.year === selectedYear)
+    .filter(park => {
+      if (!searchTerm) return true
+      const searchLower = searchTerm.toLowerCase()
+      const teamName = park.team.toLowerCase()
+      const venueName = park.venue.toLowerCase()
+      return teamName.includes(searchLower) || venueName.includes(searchLower)
+    })
 
-  const getSortIcon = (key: keyof (typeof parkFactorsData)[0]) => {
-    if (sortConfig.key !== key) {
-      return <ArrowUpDown className="h-4 w-4" />
-    }
-    return sortConfig.direction === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+  // Debug log for filtered data
+  useEffect(() => {
+    console.log("Selected year:", selectedYear)
+    console.log("Search term:", searchTerm)
+    console.log("Filtered parks:", filteredParks)
+  }, [selectedYear, searchTerm, filteredParks])
+
+  if (error) {
+    return (
+      <Card className="p-6">
+        <div className="text-red-500">Error loading park factors: {error}</div>
+      </Card>
+    )
   }
 
   return (
-    <div className="container py-6">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold">MLB Park Factors</h1>
+        <div className="flex items-center gap-4">
+          <Select
+            value={selectedYear}
+            onValueChange={setSelectedYear}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="All Years" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Years</SelectItem>
+              {years.map(year => (
+                <SelectItem key={year} value={year}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            type="search"
+            placeholder="Search parks..."
+            className="max-w-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>MLB Park Factors</CardTitle>
-              <CardDescription>Statistics and metrics for MLB ballparks</CardDescription>
-            </div>
-            <Select value={year} onValueChange={setYear}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select Year" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="2023">2023 Season</SelectItem>
-                <SelectItem value="2022">2022 Season</SelectItem>
-                <SelectItem value="2021">2021 Season</SelectItem>
-              </SelectContent>
-            </Select>
+        {loading ? (
+          <div className="p-4 space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Park</TableHead>
-                  <TableHead>Team</TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSort("parkFactor")}
-                      className="flex items-center gap-1 p-0 font-semibold hover:bg-transparent"
-                    >
-                      Park Factor {getSortIcon("parkFactor")}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSort("wOBACon")}
-                      className="flex items-center gap-1 p-0 font-semibold hover:bg-transparent"
-                    >
-                      wOBACon {getSortIcon("wOBACon")}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSort("BACON")}
-                      className="flex items-center gap-1 p-0 font-semibold hover:bg-transparent"
-                    >
-                      BACON {getSortIcon("BACON")}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSort("hardHitPct")}
-                      className="flex items-center gap-1 p-0 font-semibold hover:bg-transparent"
-                    >
-                      Hard Hit % {getSortIcon("hardHitPct")}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSort("R")}
-                      className="flex items-center gap-1 p-0 font-semibold hover:bg-transparent"
-                    >
-                      R {getSortIcon("R")}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSort("HR")}
-                      className="flex items-center gap-1 p-0 font-semibold hover:bg-transparent"
-                    >
-                      HR {getSortIcon("HR")}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSort("BB")}
-                      className="flex items-center gap-1 p-0 font-semibold hover:bg-transparent"
-                    >
-                      BB {getSortIcon("BB")}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSort("SO")}
-                      className="flex items-center gap-1 p-0 font-semibold hover:bg-transparent"
-                    >
-                      SO {getSortIcon("SO")}
-                    </Button>
-                  </TableHead>
+        ) : filteredParks.length === 0 ? (
+          <div className="p-6 text-center text-muted-foreground">
+            {searchTerm || selectedYear ? "No parks found matching your filters" : "No park data available"}
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Rk.</TableHead>
+                <TableHead>Team</TableHead>
+                <TableHead>Venue</TableHead>
+                <TableHead>Year</TableHead>
+                <TableHead className="text-right">Park Factor</TableHead>
+                <TableHead className="text-right">wOBACon</TableHead>
+                <TableHead className="text-right">xwOBACon</TableHead>
+                <TableHead className="text-right">BACON</TableHead>
+                <TableHead className="text-right">xBACON</TableHead>
+                <TableHead className="text-right">HardHit</TableHead>
+                <TableHead className="text-right">R</TableHead>
+                <TableHead className="text-right">OBP</TableHead>
+                <TableHead className="text-right">H</TableHead>
+                <TableHead className="text-right">1B</TableHead>
+                <TableHead className="text-right">2B</TableHead>
+                <TableHead className="text-right">3B</TableHead>
+                <TableHead className="text-right">HR</TableHead>
+                <TableHead className="text-right">BB</TableHead>
+                <TableHead className="text-right">SO</TableHead>
+                <TableHead className="text-right">PA</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredParks.map((park, index) => (
+                <TableRow key={`${park.team}-${index}`}>
+                  <TableCell>{park.rank}</TableCell>
+                  <TableCell className="font-medium">{park.team}</TableCell>
+                  <TableCell>{park.venue}</TableCell>
+                  <TableCell>{park.year}</TableCell>
+                  <TableCell className="text-right">{park.parkFactor}</TableCell>
+                  <TableCell className="text-right">{park.wOBACon}</TableCell>
+                  <TableCell className="text-right">{park.xwOBACon}</TableCell>
+                  <TableCell className="text-right">{park.BACON}</TableCell>
+                  <TableCell className="text-right">{park.xBACON}</TableCell>
+                  <TableCell className="text-right">{park.hardHit}</TableCell>
+                  <TableCell className="text-right">{park.runs}</TableCell>
+                  <TableCell className="text-right">{park.obp}</TableCell>
+                  <TableCell className="text-right">{park.hits}</TableCell>
+                  <TableCell className="text-right">{park.singles}</TableCell>
+                  <TableCell className="text-right">{park.doubles}</TableCell>
+                  <TableCell className="text-right">{park.triples}</TableCell>
+                  <TableCell className="text-right">{park.hr}</TableCell>
+                  <TableCell className="text-right">{park.bb}</TableCell>
+                  <TableCell className="text-right">{park.so}</TableCell>
+                  <TableCell className="text-right">{park.pa}</TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedData.map((park) => (
-                  <TableRow key={park.id}>
-                    <TableCell className="font-medium">{park.name}</TableCell>
-                    <TableCell>{park.team}</TableCell>
-                    <TableCell className={getValueColor("parkFactor", park.parkFactor)}>{park.parkFactor}</TableCell>
-                    <TableCell className={getValueColor("wOBACon", park.wOBACon)}>{park.wOBACon.toFixed(3)}</TableCell>
-                    <TableCell className={getValueColor("BACON", park.BACON)}>{park.BACON.toFixed(3)}</TableCell>
-                    <TableCell className={getValueColor("hardHitPct", park.hardHitPct)}>
-                      {park.hardHitPct.toFixed(1)}%
-                    </TableCell>
-                    <TableCell className={getValueColor("R", park.R)}>{park.R}</TableCell>
-                    <TableCell className={getValueColor("HR", park.HR)}>{park.HR}</TableCell>
-                    <TableCell>{park.BB}</TableCell>
-                    <TableCell className={getValueColor("SO", park.SO)}>{park.SO}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </div>
   )
