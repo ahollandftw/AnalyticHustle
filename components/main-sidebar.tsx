@@ -28,6 +28,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { cn } from "@/lib/utils"
 
 // Add useTeamColor import
 import { useTeamColor } from "@/components/team-color-provider"
@@ -41,6 +42,35 @@ const getSportFromPath = (pathname: string) => {
   return "mlb" // Default to MLB
 }
 
+const mlbLinks = [
+  { name: "Lineups", href: "/mlb/lineups" },
+  { name: "BvP", href: "/mlb/bvp" },
+  { name: "Daily Matchups", href: "/mlb/daily-matchups" },
+  { name: "Games", href: "/mlb/games" },
+  { name: "HR Live Odds", href: "/mlb/hr-live-odds" },
+  { name: "Implied Totals", href: "/mlb/implied-totals" },
+  { name: "Park Factors", href: "/mlb/park-factors" },
+  { name: "Players", href: "/mlb/players" },
+]
+
+const nbaLinks = [
+  { name: "Games", href: "/nba/games" },
+  { name: "Players", href: "/nba/players" },
+  { name: "Teams", href: "/nba/teams" },
+]
+
+const nflLinks = [
+  { name: "Games", href: "/nfl/games" },
+  { name: "Players", href: "/nfl/players" },
+  { name: "Teams", href: "/nfl/teams" },
+]
+
+const nhlLinks = [
+  { name: "Games", href: "/nhl/games" },
+  { name: "Players", href: "/nhl/players" },
+  { name: "Teams", href: "/nhl/teams" },
+]
+
 export function MainSidebar() {
   const pathname = usePathname()
   const currentSport = getSportFromPath(pathname)
@@ -49,6 +79,23 @@ export function MainSidebar() {
   // Inside the MainSidebar component, add this line after the pathname and currentSport variables
   const { teamColor } = useTeamColor()
   const isMLBSection = pathname.startsWith("/mlb")
+
+  const getLinks = () => {
+    switch (currentSport) {
+      case "mlb":
+        return mlbLinks
+      case "nba":
+        return nbaLinks
+      case "nfl":
+        return nflLinks
+      case "nhl":
+        return nhlLinks
+      default:
+        return []
+    }
+  }
+
+  const links = getLinks()
 
   const navItems = [
     {
@@ -131,6 +178,8 @@ export function MainSidebar() {
       ]
     : []
 
+  if (links.length === 0) return null
+
   return (
     <Sidebar>
       {/* Update the SidebarHeader to use team colors in MLB section */}
@@ -144,12 +193,19 @@ export function MainSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={item.title}>
-                    <Link href={item.href}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+              {links.map((link) => (
+                <SidebarMenuItem key={link.href}>
+                  <SidebarMenuButton asChild isActive={pathname === link.href} tooltip={link.name}>
+                    <Link
+                      href={link.href}
+                      className={cn(
+                        "flex items-center rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
+                        pathname === link.href
+                          ? "bg-accent text-accent-foreground"
+                          : "transparent"
+                      )}
+                    >
+                      <span>{link.name}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
