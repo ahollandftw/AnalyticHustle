@@ -11,164 +11,250 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useState, useEffect } from "react"
+import evBatters from "@/Data/EVBatters.json"
+import evPitchers from "@/Data/EVPitchers.json"
+import parkFactors from "@/Data/ParkFactors.json"
+import { ArrowUpDown } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import hittersVsR from "@/Data/HittersvR.json"
 import hittersVsL from "@/Data/HittersvL.json"
 import pitchersVsR from "@/Data/PitchersvR.json"
 import pitchersVsL from "@/Data/PitchersvL.json"
-import evBatters from "@/Data/EVBatters.json"
-import evPitchers from "@/Data/EVPitchers.json"
-import parkFactors from "@/Data/ParkFactors.json"
-import { useState, useEffect } from "react"
+import statcastBatters from "@/Data/StatcastBatters.json"
+import statcastPitchers from "@/Data/StatcastPitchers.json"
+
+interface EVBatter {
+  "last_name, first_name": string;
+  player_id: number;
+  attempts: number;
+  brl_pa: number;
+  brl_percent: number;
+  _sheetName: string;
+}
+
+interface EVPitcher {
+  "last_name, first_name": string;
+  player_id: number;
+  attempts: number;
+  brl_pa: number;
+  brl_percent: number;
+  _sheetName: string;
+}
+
+interface ParkFactor {
+  Team: string;
+  "Park Factor": number;
+}
+
+interface StartingPitcher {
+  name: string;
+  throws: "L" | "R";
+}
 
 interface Stats {
-  avg: string
-  obp: string
-  slg: string
-  ops: string
-  hr: number
-  rbi: number
-  so: number
-  bb: number
-  pa: number
+  avg: string;
+  obp: string;
+  slg: string;
+  ops: string;
+  hr: number;
+  rbi: number;
+  so: number;
+  bb: number;
+  pa: number;
 }
 
 interface Player {
-  id: string
-  name: string
-  position: string
-  bats: string
-  throws?: string
-  stats: Stats
-  team?: string
-  opposingTeam?: string
-  opposingPitcher?: string
-  opposingPitcherThrows?: string
-  homeGame?: boolean
+  id: string;
+  name: string;
+  position: string;
+  bats: string;
+  stats: Stats;
+  team?: string;
+  opposingTeam?: string;
+  opposingPitcher?: string;
+  opposingPitcherThrows?: string;
+  homeGame?: boolean;
 }
 
 interface Team {
-  id: string
-  name: string
-  lineup: Player[]
-  startingPitcher?: Player
+  id: string;
+  name: string;
+  lineup: Player[];
+  startingPitcher?: StartingPitcher;
 }
 
 interface Game {
-  id: string
-  startTime: string
-  awayTeam: Team
-  homeTeam: Team
+  id: string;
+  startTime: string;
+  awayTeam: Team;
+  homeTeam: Team;
 }
 
-interface HitterStats {
-  HR_rate: number
-  BarrelRate: number
-  HardHitRate: number
-  ExitVelo: number
-  LaunchAngle: number
-  FlyBallRate: number
-  PullRate: number
-  HR_FB_Rate: number
-  ISO: number
-}
+function getHitterStats(name: string, bats: string, pitcherThrows: string) {
+  // Get platoon stats
+  const hitterData = pitcherThrows === 'L' ? 
+    hittersVsL.find(h => h.Name_1 === name) :
+    hittersVsR.find(h => h.Name_1 === name)
 
-interface PitcherStats {
-  PitcherHR_9: number
-  PitcherBarrelRate: number
-  PitcherFBRate: number
-}
-
-// Default weights for HR probability calculation
-const DEFAULT_WEIGHTS = {
-  HR_rate: 1,
-  BarrelRate: 1,
-  HardHitRate: 1,
-  ExitVelo: 1,
-  LaunchAngle: 1,
-  FlyBallRate: 1,
-  PullRate: 1,
-  HR_FB_Rate: 1,
-  ISO: 1,
-  PitcherHR_9: 1,
-  PitcherBarrelRate: 1,
-  PitcherFBRate: 1,
-  ParkFactor: 1
-}
-
-function getHitterStats(playerName: string, bats: string, opposingPitcherThrows: string): HitterStats | null {
-  // Get splits data based on batter handedness and pitcher handedness
-  const splitData = opposingPitcherThrows === 'L' ? hittersVsL : hittersVsR
-  const hitterSplits = splitData.find(h => h.Name_1 === playerName)
-
+  // Get Statcast data
+  const statcastData = statcastBatters.find(h => h.player_name === name)
+  
   // Get EV data
-  const evData = evBatters.find(b => b["last_name, first_name"] === playerName)
+  const evData = evBatters.find(h => h["last_name, first_name"] === name)
 
-  if (!hitterSplits || !evData) return null
+  // Debug logging
+  console.log('Hitter lookup:', {
+    name,
+    foundInPlatoon: !!hitterData,
+    foundInStatcast: !!statcastData,
+    foundInEV: !!evData,
+    platoonData: hitterData,
+    statcastData,
+    evData
+  })
+
+  if (!hitterData) {
+    // Try alternate name formats
+    const [lastName, firstName] = name.split(', ').reverse()
+    const alternateName = `${firstName} ${lastName}`
+    const alternateHitterData = pitcherThrows === 'L' ?
+      hittersVsL.find(h => h.Name_1 === alternateName) :
+      hittersVsR.find(h => h.Name_1 === alternateName)
+    
+    if (alternateHitterData) {
+      console.log('Found hitter with alternate name format:', alternateName)
+      return {
+        hr_per_pa: alternateHitterData.HR / alternateHitterData.PA,
+        hr_per_fb: alternateHitterData["HR/FB"],
+        fb_percent: alternateHitterData["FB%"],
+        pull_percent: alternateHitterData["Pull%"],
+        hard_hit: statcastData?.hard_hit_percent ?? 35, // League average fallback
+        barrel_rate: evData?.brl_pa ?? 7 // League average fallback
+      }
+    }
+    
+    // If still no data, use league averages
+    console.log('Using league averages for hitter:', name)
+    return {
+      hr_per_pa: 0.035, // League average ~3.5% HR/PA
+      hr_per_fb: 0.15,  // League average ~15% HR/FB
+      fb_percent: 0.35, // League average ~35% FB
+      pull_percent: 0.40, // League average ~40% Pull
+      hard_hit: 35, // League average ~35%
+      barrel_rate: 7 // League average ~7%
+    }
+  }
 
   return {
-    HR_rate: (hitterSplits.HR / hitterSplits.PA) * 100,
-    BarrelRate: evData.brl_percent,
-    HardHitRate: evData.ev95percent,
-    ExitVelo: evData.avg_hit_speed,
-    LaunchAngle: evData.avg_hit_angle,
-    FlyBallRate: hitterSplits["FB%"] * 100,
-    PullRate: hitterSplits["Pull%"] * 100,
-    HR_FB_Rate: hitterSplits["HR/FB"] * 100,
-    ISO: hitterSplits.ISO
+    hr_per_pa: hitterData.HR / hitterData.PA,
+    hr_per_fb: hitterData["HR/FB"],
+    fb_percent: hitterData["FB%"],
+    pull_percent: hitterData["Pull%"],
+    hard_hit: statcastData?.hard_hit_percent ?? 35,
+    barrel_rate: evData?.brl_pa ?? 7
   }
 }
 
-function getPitcherStats(pitcherName: string, opposingBatterHand: string): PitcherStats | null {
-  // Get splits data based on batter handedness
-  const splitData = opposingBatterHand === 'L' ? pitchersVsL : pitchersVsR
-  const pitcherSplits = splitData.find(p => p.Name_1 === pitcherName)
+function getPitcherStats(name: string, batterHand: string) {
+  if (name === 'TBD') {
+    console.log('Using league averages for TBD pitcher')
+    return {
+      hr_per_9: 1.2,  // League average HR/9
+      fb_percent: 0.35, // League average FB%
+      gb_percent: 0.43, // League average GB%
+      hard_hit: 35, // League average hard hit%
+      barrel_rate: 7 // League average barrel rate
+    }
+  }
+
+  // Get platoon stats
+  const pitcherData = batterHand === 'L' ?
+    pitchersVsL.find(p => p.Name_1 === name) :
+    pitchersVsR.find(p => p.Name_1 === name)
+
+  // Get Statcast data
+  const statcastData = statcastPitchers.find(p => p["last_name, first_name"] === name)
 
   // Get EV data
-  const evData = evPitchers.find(p => p["last_name, first_name"] === pitcherName)
+  const evData = evPitchers.find(p => p["last_name, first_name"] === name)
 
-  if (!pitcherSplits || !evData) return null
+  // Debug logging
+  console.log('Pitcher lookup:', {
+    name,
+    foundInPlatoon: !!pitcherData,
+    foundInStatcast: !!statcastData,
+    foundInEV: !!evData,
+    platoonData: pitcherData,
+    statcastData,
+    evData
+  })
+
+  if (!pitcherData) {
+    // Try alternate name formats
+    const [lastName, firstName] = name.split(', ').reverse()
+    const alternateName = `${firstName} ${lastName}`
+    const alternatePitcherData = batterHand === 'L' ?
+      pitchersVsL.find(p => p.Name_1 === alternateName) :
+      pitchersVsR.find(p => p.Name_1 === alternateName)
+
+    if (alternatePitcherData) {
+      console.log('Found pitcher with alternate name format:', alternateName)
+      return {
+        hr_per_9: alternatePitcherData["HR/9"],
+        fb_percent: alternatePitcherData["FB%"],
+        gb_percent: alternatePitcherData["GB%"],
+        hard_hit: statcastData?.hard_hit_percent ?? 35,
+        barrel_rate: evData?.brl_pa ?? 7
+      }
+    }
+
+    // If still no data, use league averages
+    console.log('Using league averages for pitcher:', name)
+    return {
+      hr_per_9: 1.2,
+      fb_percent: 0.35,
+      gb_percent: 0.43,
+      hard_hit: 35,
+      barrel_rate: 7
+    }
+  }
 
   return {
-    PitcherHR_9: pitcherSplits["HR/9"],
-    PitcherBarrelRate: evData.brl_percent,
-    PitcherFBRate: pitcherSplits["FB%"] * 100
+    hr_per_9: pitcherData["HR/9"],
+    fb_percent: pitcherData["FB%"],
+    gb_percent: pitcherData["GB%"],
+    hard_hit: statcastData?.hard_hit_percent ?? 35,
+    barrel_rate: evData?.brl_pa ?? 7
   }
 }
 
-function getParkFactor(teamName: string): number {
-  const park = parkFactors.find(p => p.Team?.trim().includes(teamName.split(' ')[1]))
-  return park?.["Park Factor"] ?? 100
+function getParkFactor(teamName: string) {
+  const park = parkFactors.find(p => p.Team === teamName)
+  return park?.["Park Factor"] ?? 1.0
 }
 
 async function calculateHRProbability(
-  hitter: HitterStats,
-  pitcher: PitcherStats,
+  hitterStats: any,
+  pitcherStats: any,
   parkFactor: number
-): Promise<number> {
-  try {
-    const response = await fetch('/api/hr-probability', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        hitter,
-        pitcher,
-        parkFactor,
-        weights: DEFAULT_WEIGHTS
-      }),
-    })
+) {
+  // Base HR rate from historical data (convert HR/PA to a percentage)
+  const baseHRRate = hitterStats.hr_per_pa * 100 // Convert to percentage
 
-    if (!response.ok) {
-      throw new Error('Failed to calculate HR probability')
-    }
+  // Adjust for pitcher quality (HR/9 where league average is 1.2)
+  const pitcherAdjustment = (pitcherStats.hr_per_9 / 1.2)
 
-    const data = await response.json()
-    return data.probability
-  } catch (error) {
-    console.error('Error calculating HR probability:', error)
-    return 0
-  }
+  // Adjust for matchup factors
+  const fbAdjustment = Math.min(2.0, (hitterStats.fb_percent * pitcherStats.fb_percent) / 0.1225) // 0.35 * 0.35 = 0.1225
+  const pullAdjustment = hitterStats.pull_percent > 0.45 ? 1.2 : 1.0 // Bigger boost for pull hitters
+  const hardHitAdjustment = Math.min(2.0, ((hitterStats.hard_hit + pitcherStats.hard_hit) / 2) / 30) // Normalize to league average
+  
+  // Combine all factors
+  let adjustedRate = (baseHRRate * pitcherAdjustment * fbAdjustment * pullAdjustment * hardHitAdjustment * parkFactor)
+
+  // Cap the probability at reasonable limits (between 2% and 35% per PA)
+  return Math.min(Math.max(adjustedRate / 100, 0.02), 0.35)
 }
 
 export default function HRProjectionsPage() {
@@ -178,6 +264,30 @@ export default function HRProjectionsPage() {
   })
 
   const [battersWithProbabilities, setBattersWithProbabilities] = useState<(Player & { probability: number })[]>([])
+  const [sortConfig, setSortConfig] = useState<{ key: 'probability' | 'hr', direction: 'asc' | 'desc' }>({
+    key: 'probability',
+    direction: 'desc'
+  })
+
+  const sortData = (data: (Player & { probability: number })[], key: 'probability' | 'hr', direction: 'asc' | 'desc') => {
+    return [...data].sort((a, b) => {
+      const aValue = key === 'hr' ? a.stats[key] : a[key]
+      const bValue = key === 'hr' ? b.stats[key] : b[key]
+      return direction === 'asc' ? aValue - bValue : bValue - aValue
+    })
+  }
+
+  const handleSort = (key: 'probability' | 'hr') => {
+    setSortConfig(current => {
+      if (current.key === key) {
+        return {
+          key,
+          direction: current.direction === 'asc' ? 'desc' : 'asc'
+        }
+      }
+      return { key, direction: 'desc' }
+    })
+  }
 
   useEffect(() => {
     async function calculateProbabilities() {
@@ -221,12 +331,12 @@ export default function HRProjectionsPage() {
       })
 
       const completedBatters = await Promise.all(batterPromises)
-      const sortedBatters = [...completedBatters].sort((a, b) => b.probability - a.probability)
+      const sortedBatters = sortData(completedBatters, sortConfig.key, sortConfig.direction)
       setBattersWithProbabilities(sortedBatters)
     }
 
     calculateProbabilities()
-  }, [games])
+  }, [games, sortConfig])
 
   if (error) {
     return (
@@ -252,8 +362,26 @@ export default function HRProjectionsPage() {
               <TableHead className="text-center">Name</TableHead>
               <TableHead className="text-center">Team</TableHead>
               <TableHead className="text-center">vs Pitcher</TableHead>
-              <TableHead className="text-center">HR Prob</TableHead>
-              <TableHead className="text-center">Season HR</TableHead>
+              <TableHead className="text-center">
+                <Button
+                  variant="ghost"
+                  onClick={() => handleSort('probability')}
+                  className="w-full"
+                >
+                  HR Prob
+                  <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+              </TableHead>
+              <TableHead className="text-center">
+                <Button
+                  variant="ghost"
+                  onClick={() => handleSort('hr')}
+                  className="w-full"
+                >
+                  Season HR
+                  <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
