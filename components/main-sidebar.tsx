@@ -42,10 +42,9 @@ const getSportFromPath = (pathname: string) => {
 
 const navItems = {
   mlb: [
-    { title: "Lineups", href: "/mlb/lineups", icon: ListFilter },
+    { title: "Games", href: "/mlb/games", icon: Home },
     { title: "BvP", href: "/mlb/bvp", icon: BarChart3 },
     { title: "Daily Matchups", href: "/mlb/daily-matchups", icon: Calendar },
-    { title: "Games", href: "/mlb/games", icon: Home },
     { title: "HR Live Odds", href: "/mlb/hr-live-odds", icon: Zap },
     { title: "Implied Totals", href: "/mlb/implied-totals", icon: TrendingUp },
     { title: "Park Factors", href: "/mlb/park-factors", icon: Stadium },
@@ -71,6 +70,25 @@ const navItems = {
 const communityItems = [
   { title: "Hall of Bang", href: "/community/hall-of-bang", icon: Trophy },
   { title: "Community Bets", href: "/community/bets", icon: Users2 },
+]
+
+const mlbLinks = [
+  {
+    title: "Games",
+    href: "/mlb/games",
+  },
+  {
+    title: "Park Factors",
+    href: "/mlb/park-factors",
+  },
+  {
+    title: "Player Stats",
+    href: "/mlb/player-stats",
+  },
+  {
+    title: "Team Stats",
+    href: "/mlb/team-stats",
+  },
 ]
 
 export function MainSidebar() {

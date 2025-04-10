@@ -1,207 +1,316 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CalendarIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { format } from "date-fns"
+import { useData } from "@/lib/hooks/use-data"
+import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
 
-// Mock data for matchups
-const matchupsData = [
-  {
-    id: 1,
-    homeTeam: {
-      name: "New York Yankees",
-      record: "92-70",
-      starter: {
-        name: "Gerrit Cole",
-        era: 3.14,
-        whip: 0.98,
-      },
-      impliedRuns: 4.7,
-      moneyline: -150,
-    },
-    awayTeam: {
-      name: "Boston Red Sox",
-      record: "78-84",
-      starter: {
-        name: "Chris Sale",
-        era: 3.92,
-        whip: 1.15,
-      },
-      impliedRuns: 3.9,
-      moneyline: +130,
-    },
-    time: "7:05 PM ET",
-    total: 8.5,
-  },
-  {
-    id: 2,
-    homeTeam: {
-      name: "Los Angeles Dodgers",
-      record: "100-62",
-      starter: {
-        name: "Shohei Ohtani",
-        era: 3.14,
-        whip: 1.06,
-      },
-      impliedRuns: 5.2,
-      moneyline: -200,
-    },
-    awayTeam: {
-      name: "San Francisco Giants",
-      record: "79-83",
-      starter: {
-        name: "Logan Webb",
-        era: 3.25,
-        whip: 1.12,
-      },
-      impliedRuns: 3.3,
-      moneyline: +170,
-    },
-    time: "10:10 PM ET",
-    total: 8.5,
-  },
-  {
-    id: 3,
-    homeTeam: {
-      name: "Atlanta Braves",
-      record: "104-58",
-      starter: {
-        name: "Spencer Strider",
-        era: 3.86,
-        whip: 1.09,
-      },
-      impliedRuns: 5.0,
-      moneyline: -180,
-    },
-    awayTeam: {
-      name: "Philadelphia Phillies",
-      record: "90-72",
-      starter: {
-        name: "Zack Wheeler",
-        era: 2.87,
-        whip: 1.04,
-      },
-      impliedRuns: 3.5,
-      moneyline: +150,
-    },
-    time: "7:20 PM ET",
-    total: 8.5,
-  },
-]
+interface Player {
+  name: string;
+  position: string;
+  battingOrder?: number;
+  stats?: {
+    avg: string;
+    hr: number;
+    rbi: number;
+    hrProj?: number;
+  };
+  isProjected?: boolean;
+}
 
-export default function MatchupsPage() {
-  const [date, setDate] = useState<Date>(new Date())
-  const [view, setView] = useState("matchups")
+interface Team {
+  name: string;
+  lineup: Player[];
+  startingPitcher?: Player;
+  projectedLineup?: Player[];
+  score?: number;
+  record?: string;
+  moneyLine?: number;
+  impliedRuns?: number;
+}
+
+interface Weather {
+  temperature: number;
+  condition: string;
+  windSpeed: number;
+  windDirection: string;
+}
+
+interface Game {
+  id: string;
+  startTime: string;
+  status: string;
+  inning?: number;
+  isTopInning?: boolean;
+  awayTeam: Team;
+  homeTeam: Team;
+  weather?: Weather;
+  odds?: {
+    spread: string;
+    total: number;
+  };
+}
+
+const StatusDot = ({ confirmed }: { confirmed: boolean }) => (
+  <div className="flex items-center gap-2">
+    <div 
+      className={`h-2 w-2 rounded-full ${confirmed ? 'bg-green-500' : 'bg-yellow-500'}`} 
+    />
+    <span className="text-xs text-muted-foreground">
+      {confirmed ? 'Confirmed' : 'Projected'}
+    </span>
+  </div>
+)
+
+const GameStatus = ({ game }: { game: Game }) => {
+  if (game.status === "LIVE") {
+    return (
+      <Badge variant="default" className="bg-green-500">
+        {game.isTopInning ? "Top" : "Bottom"} {game.inning}
+      </Badge>
+    )
+  }
+  if (game.status === "FINAL") {
+    return <Badge variant="secondary">Final</Badge>
+  }
+  return <Badge variant="outline">Scheduled</Badge>
+}
+
+export default function GamesPage() {
+  const [searchTerm, setSearchTerm] = useState("")
+  const { data, loading, error } = useData<Game[]>({ 
+    type: "games",
+    sport: "mlb"
+  })
+
+  // Filter games based on search term
+  const filteredGames = data?.filter(game => {
+    if (!searchTerm) return true
+    const searchLower = searchTerm.toLowerCase()
+    return (
+      game.awayTeam.name.toLowerCase().includes(searchLower) ||
+      game.homeTeam.name.toLowerCase().includes(searchLower)
+    )
+  }) || []
+
+  const getLineupToShow = (team: Team) => {
+    if (team.lineup && team.lineup.length > 0) {
+      return { lineup: team.lineup, isProjected: false };
+    }
+    if (team.projectedLineup && team.projectedLineup.length > 0) {
+      const projectedLineup = team.projectedLineup.map(player => ({
+        ...player,
+        isProjected: true
+      }));
+      return { lineup: projectedLineup, isProjected: true };
+    }
+    return { lineup: [], isProjected: true };
+  };
+
+  if (error) {
+    return (
+      <Card className="p-6">
+        <div className="text-red-500">Error loading games: {error}</div>
+      </Card>
+    )
+  }
 
   return (
-    <div className="container py-6">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle>MLB Daily Matchups</CardTitle>
-              <CardDescription>View today's games, pitching matchups, and odds</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-[240px] justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(date, "PPP")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar mode="single" selected={date} onSelect={(date) => date && setDate(date)} initialFocus />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="matchups" value={view} onValueChange={setView} className="mb-6">
-            <TabsList>
-              <TabsTrigger value="matchups">Matchups</TabsTrigger>
-              <TabsTrigger value="odds">Odds</TabsTrigger>
-              <TabsTrigger value="weather">Weather</TabsTrigger>
-            </TabsList>
-          </Tabs>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">MLB Games</h1>
+        <Input
+          type="search"
+          placeholder="Search teams..."
+          className="max-w-sm"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
 
-          <div className="grid gap-6">
-            {matchupsData.map((matchup) => (
-              <Card key={matchup.id}>
-                <CardContent className="p-6">
-                  <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="text-lg font-semibold">{matchup.awayTeam.name}</div>
-                      <div className="text-sm text-muted-foreground">{matchup.awayTeam.record}</div>
-                      <div className="mt-2 text-sm">
-                        <span className="font-medium">{matchup.awayTeam.starter.name}</span>
-                        <div className="text-xs text-muted-foreground">
-                          ERA: {matchup.awayTeam.starter.era} | WHIP: {matchup.awayTeam.starter.whip}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="text-sm font-medium">{matchup.time}</div>
-                      <div className="my-2 text-2xl font-bold">@</div>
-                      {view === "odds" && (
-                        <div className="mt-2 flex flex-col items-center">
-                          <div className="text-sm">
-                            <span className="font-medium">Total:</span> O/U {matchup.total}
-                          </div>
-                          <div className="mt-1 flex gap-4 text-sm">
-                            <div>
-                              <span className="font-medium">ML:</span>{" "}
-                              <span className={matchup.awayTeam.moneyline > 0 ? "text-green-500" : "text-red-500"}>
-                                {matchup.awayTeam.moneyline > 0 ? "+" : ""}
-                                {matchup.awayTeam.moneyline}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="font-medium">ML:</span>{" "}
-                              <span className={matchup.homeTeam.moneyline > 0 ? "text-green-500" : "text-red-500"}>
-                                {matchup.homeTeam.moneyline > 0 ? "+" : ""}
-                                {matchup.homeTeam.moneyline}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="text-lg font-semibold">{matchup.homeTeam.name}</div>
-                      <div className="text-sm text-muted-foreground">{matchup.homeTeam.record}</div>
-                      <div className="mt-2 text-sm">
-                        <span className="font-medium">{matchup.homeTeam.starter.name}</span>
-                        <div className="text-xs text-muted-foreground">
-                          ERA: {matchup.homeTeam.starter.era} | WHIP: {matchup.homeTeam.starter.whip}
-                        </div>
-                      </div>
+      {loading ? (
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i} className="p-4">
+              <Skeleton className="h-[400px] w-full" />
+            </Card>
+          ))}
+        </div>
+      ) : filteredGames.length === 0 ? (
+        <Card className="p-6">
+          <div className="text-center text-muted-foreground">
+            {searchTerm ? "No games found matching your search" : "No games scheduled"}
+          </div>
+        </Card>
+      ) : (
+        <div className="space-y-6">
+          {filteredGames.map((game) => {
+            const awayLineup = getLineupToShow(game.awayTeam);
+            const homeLineup = getLineupToShow(game.homeTeam);
+
+            return (
+              <Card key={game.id} className="p-4">
+                {/* Game Header */}
+                <div className="mb-6 text-center">
+                  <div className="flex items-center justify-center gap-3 mb-2">
+                    <GameStatus game={game} />
+                    <div className="text-muted-foreground">
+                      {new Date(game.startTime).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                      })}
                     </div>
                   </div>
-                  {view === "matchups" && (
-                    <div className="mt-4 grid grid-cols-2 gap-4 border-t pt-4">
-                      <div className="flex flex-col items-center">
-                        <div className="text-sm font-medium">Implied Runs</div>
-                        <div className="text-lg font-bold">{matchup.awayTeam.impliedRuns}</div>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <div className="text-sm font-medium">Implied Runs</div>
-                        <div className="text-lg font-bold">{matchup.homeTeam.impliedRuns}</div>
+                </div>
+
+                {/* Lineups */}
+                <div className="grid gap-8 md:grid-cols-2">
+                  {/* Away Team */}
+                  <div>
+                    <div className="mb-4 text-center">
+                      <h3 className="text-xl font-semibold">{game.awayTeam.name}</h3>
+                      {game.awayTeam.startingPitcher && (
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          {game.awayTeam.startingPitcher.name} (P)
+                          {game.awayTeam.moneyLine && (
+                            <span className="ml-2">({game.awayTeam.moneyLine > 0 ? '+' : ''}{game.awayTeam.moneyLine})</span>
+                          )}
+                        </div>
+                      )}
+                      <div className="mt-2 text-sm font-medium">
+                        Implied Runs: {game.awayTeam.impliedRuns || '-'}
                       </div>
                     </div>
-                  )}
-                </CardContent>
+                    {game.awayTeam.lineup.length > 0 ? (
+                      <div>
+                        <div className="mb-2 flex items-center justify-end">
+                          <StatusDot confirmed={!game.awayTeam.lineup[0]?.isProjected} />
+                        </div>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[10%] text-center">#</TableHead>
+                              <TableHead className="w-[40%]">Player</TableHead>
+                              <TableHead className="w-[15%] text-center">Pos</TableHead>
+                              <TableHead className="w-[15%] text-center">AVG</TableHead>
+                              <TableHead className="w-[20%] text-center">HR Proj.</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {game.awayTeam.lineup.map((player, index) => (
+                              <TableRow 
+                                key={`${game.id}-away-${index}-${player.name}`}
+                                className={player.isProjected ? "opacity-75" : ""}
+                              >
+                                <TableCell className="text-center">{player.battingOrder || (index + 1)}</TableCell>
+                                <TableCell>{player.name}</TableCell>
+                                <TableCell className="text-center">{player.position}</TableCell>
+                                <TableCell className="text-center">{player.stats?.avg || '.000'}</TableCell>
+                                <TableCell className="text-center">{player.stats?.hrProj || '-'}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+                        Lineup not yet available
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Home Team */}
+                  <div>
+                    <div className="mb-4 text-center">
+                      <h3 className="text-xl font-semibold">{game.homeTeam.name}</h3>
+                      {game.homeTeam.startingPitcher && (
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          {game.homeTeam.startingPitcher.name} (P)
+                          {game.homeTeam.moneyLine && (
+                            <span className="ml-2">({game.homeTeam.moneyLine > 0 ? '+' : ''}{game.homeTeam.moneyLine})</span>
+                          )}
+                        </div>
+                      )}
+                      <div className="mt-2 text-sm font-medium">
+                        Implied Runs: {game.homeTeam.impliedRuns || '-'}
+                      </div>
+                    </div>
+                    {game.homeTeam.lineup.length > 0 ? (
+                      <div>
+                        <div className="mb-2 flex items-center justify-end">
+                          <StatusDot confirmed={!game.homeTeam.lineup[0]?.isProjected} />
+                        </div>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[10%] text-center">#</TableHead>
+                              <TableHead className="w-[40%]">Player</TableHead>
+                              <TableHead className="w-[15%] text-center">Pos</TableHead>
+                              <TableHead className="w-[15%] text-center">AVG</TableHead>
+                              <TableHead className="w-[20%] text-center">HR Proj.</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {game.homeTeam.lineup.map((player, index) => (
+                              <TableRow 
+                                key={`${game.id}-home-${index}-${player.name}`}
+                                className={player.isProjected ? "opacity-75" : ""}
+                              >
+                                <TableCell className="text-center">{player.battingOrder || (index + 1)}</TableCell>
+                                <TableCell>{player.name}</TableCell>
+                                <TableCell className="text-center">{player.position}</TableCell>
+                                <TableCell className="text-center">{player.stats?.avg || '.000'}</TableCell>
+                                <TableCell className="text-center">{player.stats?.hrProj || '-'}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+                        Lineup not yet available
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer with Weather and Odds */}
+                <div className="mt-6 pt-4 border-t border-border/40">
+                  <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
+                    {game.weather && (
+                      <div className="flex items-center gap-2">
+                        <span>{game.weather.temperature}°F</span>
+                        <span>•</span>
+                        <span>{game.weather.condition}</span>
+                        <span>•</span>
+                        <span>{game.weather.windSpeed} mph {game.weather.windDirection}</span>
+                      </div>
+                    )}
+                    {game.odds && (
+                      <div className="flex items-center gap-4">
+                        <span>Spread: {game.odds.spread}</span>
+                        <span>•</span>
+                        <span>O/U: {game.odds.total}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </Card>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   )
 }

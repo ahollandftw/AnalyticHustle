@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { promises as fs } from "fs"
 import path from "path"
 import { cache } from "react"
+import { fetchMLBLineups } from '@/lib/mlb'
 
 // Cache the file reading operation
 const readJsonFile = cache(async (filename: string) => {
@@ -36,91 +37,168 @@ function mergeDuplicatePlayers(players: any[]) {
   return Array.from(playerMap.values())
 }
 
-export async function GET(request: NextRequest) {
+interface Pitcher {
+  name: string
+  pitcherHand: string
+  pitcherRecord: string
+  pitcherEra: string
+}
+
+interface Player {
+  name: string;
+  position: string;
+  battingOrder?: number;
+  stats?: {
+    avg: string;
+    hr: number;
+    rbi: number;
+  };
+}
+
+interface Team {
+  name: string;
+  lineup: Player[];
+  startingPitcher?: Player;
+  projectedLineup?: Player[];
+}
+
+interface Game {
+  time: string
+  weather: string
+  away: Team
+  home: Team
+}
+
+interface MLBTeam {
+  team: {
+    name: string;
+  };
+  leagueRecord: {
+    wins: number;
+    losses: number;
+  };
+}
+
+interface MLBGame {
+  gamePk: number;
+  gameDate: string;
+  status: {
+    detailedState: string;
+  };
+  teams: {
+    away: {
+      team: {
+        name: string;
+      };
+      leagueRecord: {
+        wins: number;
+        losses: number;
+      };
+    };
+    home: {
+      team: {
+        name: string;
+      };
+      leagueRecord: {
+        wins: number;
+        losses: number;
+      };
+    };
+  };
+  venue: {
+    name: string;
+  };
+}
+
+interface MLBPlayer {
+  id: number;
+  fullName: string;
+  primaryPosition: {
+    abbreviation: string;
+  };
+  batSide?: {
+    code: string;
+  };
+  pitchHand?: {
+    code: string;
+  };
+}
+
+interface MLBLineupData {
+  dates?: Array<{
+    games?: Array<{
+      lineups?: {
+        awayPlayers?: MLBPlayer[];
+        homePlayers?: MLBPlayer[];
+      };
+    }>;
+  }>;
+}
+
+interface TransformedPlayer {
+  player: string;
+  ID: string;
+  position: string;
+  bats: string;
+  batting: number;
+  isProjected?: boolean;
+}
+
+interface TransformedTeam {
+  name: string;
+  record: string;
+  lineup: TransformedPlayer[];
+}
+
+interface TransformedGame {
+  id: string;
+  startTime: string;
+  awayTeam: Team;
+  homeTeam: Team;
+}
+
+const transformLineup = (players: any[]): Player[] => {
+  if (!Array.isArray(players)) return [];
+  
+  return players.map((player, index) => ({
+    name: player.fullName || player.name || 'Unknown Player',
+    position: player.position?.abbreviation || player.position || 'Unknown',
+    battingOrder: index + 1,
+    stats: player.stats ? {
+      avg: player.stats.batting?.avg || '.000',
+      hr: player.stats.batting?.homeRuns || 0,
+      rbi: player.stats.batting?.rbi || 0
+    } : undefined
+  }));
+};
+
+export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url)
-    const type = searchParams.get("type")
-    const sport = searchParams.get("sport")?.toLowerCase() || "mlb"
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get('type');
+    const sport = searchParams.get('sport');
 
-    if (!type) {
-      return NextResponse.json({ error: "Type parameter is required" }, { status: 400 })
+    if (!type || !sport) {
+      return NextResponse.json(
+        { error: 'Missing required parameters: type and sport' },
+        { status: 400 }
+      );
     }
 
-    let data: any = null
-
-    switch (type) {
-      case "batters":
-        if (sport === "mlb") {
-          const statcastData = await readJsonFile("StatcastBatter2.json")
-          const vsLData = await readJsonFile("HittersvL.json")
-          const vsRData = await readJsonFile("HittersvR.json")
-          const evData = await readJsonFile("EVBatters.json")
-          
-          // Merge all batter data
-          data = mergeDuplicatePlayers([
-            ...statcastData,
-            ...vsLData,
-            ...vsRData,
-            ...evData
-          ])
-        }
-        break
-
-      case "pitchers":
-        if (sport === "mlb") {
-          const statcastData = await readJsonFile("StatcastPitcher2.json")
-          const vsRData = await readJsonFile("PitchersvR.json")
-          const evData = await readJsonFile("EVPitchers.json")
-          
-          // Merge all pitcher data
-          data = mergeDuplicatePlayers([
-            ...statcastData,
-            ...vsRData,
-            ...evData
-          ])
-        }
-        break
-
-      case "parkfactors":
-        if (sport === "mlb") {
-          try {
-            data = await readJsonFile("ParkFactors.json")
-            console.log("Park factors data loaded:", {
-              count: Array.isArray(data) ? data.length : 0,
-              sample: Array.isArray(data) ? data[0] : null
-            })
-          } catch (error) {
-            console.error("Error loading park factors:", error)
-            throw error
-          }
-        }
-        break
-
-      case "lineups":
-        // This will be empty for now as mentioned
-        data = []
-        break
-
-      case "games":
-        // This will be empty for now as mentioned
-        data = []
-        break
-
-      default:
-        return NextResponse.json({ error: "Invalid type parameter" }, { status: 400 })
+    if ((type === 'games' || type === 'lineups') && sport === 'mlb') {
+      const data = await fetchMLBLineups();
+      return NextResponse.json(data);
     }
 
-    if (!data) {
-      return NextResponse.json({ error: "No data found" }, { status: 404 })
-    }
-
-    return NextResponse.json(data)
-
-  } catch (error) {
-    console.error("Error processing data request:", error)
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: 'Invalid type or sport parameter' },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error('Error in data route:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
       { status: 500 }
-    )
+    );
   }
 }
