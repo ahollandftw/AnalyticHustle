@@ -6,9 +6,17 @@ import { fetchMLBLineups } from '@/lib/mlb'
 
 // Cache the file reading operation
 const readJsonFile = cache(async (filename: string) => {
-  const filePath = path.join(process.cwd(), "data", filename)
-  const data = await fs.readFile(filePath, "utf-8")
-  return JSON.parse(data)
+  const filePath = path.join(process.cwd(), "Data", filename);
+  console.log('Reading file from:', filePath);
+  try {
+    const data = await fs.readFile(filePath, "utf-8");
+    const jsonData = JSON.parse(data);
+    console.log('Successfully read and parsed JSON data');
+    return jsonData;
+  } catch (error) {
+    console.error('Error reading file:', error);
+    throw error;
+  }
 })
 
 // Helper to merge duplicate player entries
@@ -190,6 +198,24 @@ export async function GET(request: Request) {
       const data = await fetchMLBLineups();
       console.log('MLB data fetched:', JSON.stringify(data, null, 2));
       return NextResponse.json(data);
+    }
+
+    if (type.toLowerCase() === 'parkfactors' && sport === 'mlb') {
+      console.log('Loading park factors data...');
+      try {
+        const data = await readJsonFile('ParkFactors.json');
+        if (!data) {
+          throw new Error('No data returned from readJsonFile');
+        }
+        console.log('Park factors data loaded:', data.length, 'entries');
+        return NextResponse.json(data);
+      } catch (error) {
+        console.error('Error loading park factors:', error);
+        return NextResponse.json(
+          { error: 'Failed to load park factors data' },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json(

@@ -385,13 +385,13 @@ export default function PlayersPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Input
-                placeholder="Search players..."
+                <Input
+                  placeholder="Search players..."
                 className="w-[200px] md:w-[300px]"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
             <div className="flex gap-4">
               {TABS.map((tab) => (
                 <button
@@ -411,9 +411,9 @@ export default function PlayersPage() {
           </div>
         </div>
         <div className="relative w-full overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
+              <Table>
+                <TableHeader>
+                  <TableRow>
                 {columns.map((column) => (
                   <TableHead
                     key={column.key}
@@ -422,11 +422,11 @@ export default function PlayersPage() {
                     onClick={() => handleSort(column.key)}
                   >
                     {column.label} <SortIcon columnKey={column.key} />
-                  </TableHead>
+                        </TableHead>
                 ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
               {filteredPlayers.map((player, idx) => (
                 <TableRow key={idx}>
                   {columns.map((column) => (
@@ -436,11 +436,11 @@ export default function PlayersPage() {
                         : player[column.key]}
                     </TableCell>
                   ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+          </div>
       </Card>
     </div>
   )
