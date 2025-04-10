@@ -182,19 +182,19 @@ export default function DailyMatchupsPage() {
         >
           <SelectTrigger className="w-[200px]">
             <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
+              </SelectTrigger>
+              <SelectContent>
             {allTeams.map(team => (
               <SelectItem 
                 key={`${team.id}-${team.gameId}-${team.isHome}`}
                 value={`${team.id}-${team.gameId}-${team.isHome}`}
               >
                 {team.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+                    </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         {/* Team Lineup */}
@@ -232,9 +232,9 @@ export default function DailyMatchupsPage() {
           ) : (
             <div className="text-center text-muted-foreground">
               No lineup available
-            </div>
+                  </div>
           )}
-        </Card>
+              </Card>
 
         {/* Player Stats */}
         <Card className="p-4">
@@ -247,49 +247,49 @@ export default function DailyMatchupsPage() {
                 <div>
                   <div className="text-sm text-muted-foreground">AVG</div>
                   <div className="text-xl font-semibold">{selectedPlayer.stats.avg}</div>
-                </div>
+                      </div>
                 <div>
                   <div className="text-sm text-muted-foreground">OBP</div>
                   <div className="text-xl font-semibold">{selectedPlayer.stats.obp}</div>
-                </div>
+                      </div>
                 <div>
                   <div className="text-sm text-muted-foreground">SLG</div>
                   <div className="text-xl font-semibold">{selectedPlayer.stats.slg}</div>
-                </div>
+                    </div>
                 <div>
                   <div className="text-sm text-muted-foreground">OPS</div>
                   <div className="text-xl font-semibold">{selectedPlayer.stats.ops}</div>
-                </div>
-              </div>
+                            </div>
+                          </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <div className="text-sm text-muted-foreground">HR</div>
                   <div className="text-xl font-semibold">{selectedPlayer.stats.hr}</div>
-                </div>
+                          </div>
                 <div>
                   <div className="text-sm text-muted-foreground">RBI</div>
                   <div className="text-xl font-semibold">{selectedPlayer.stats.rbi}</div>
-                </div>
+                        </div>
                 <div>
                   <div className="text-sm text-muted-foreground">PA</div>
                   <div className="text-xl font-semibold">{selectedPlayer.stats.pa}</div>
-                </div>
+                          </div>
                 <div>
                   <div className="text-sm text-muted-foreground">SO</div>
                   <div className="text-xl font-semibold">{selectedPlayer.stats.so}</div>
-                </div>
+                            </div>
                 <div>
                   <div className="text-sm text-muted-foreground">BB</div>
                   <div className="text-xl font-semibold">{selectedPlayer.stats.bb}</div>
-                </div>
-              </div>
-            </div>
+                          </div>
+                        </div>
+                          </div>
           ) : (
             <div className="text-center text-muted-foreground">
               Select a player to view their stats
-            </div>
+                          </div>
           )}
-        </Card>
+              </Card>
 
         {/* Opposing Pitcher */}
         <Card className="p-4">
@@ -299,48 +299,48 @@ export default function DailyMatchupsPage() {
               'No Pitcher Available'}
           </h2>
           {opposingTeam?.startingPitcher ? (
-            <div className="space-y-4">
+                  <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                    <div>
                   <div className="text-sm text-muted-foreground">ERA</div>
                   <div className="text-xl font-semibold">{opposingTeam.startingPitcher.stats.era}</div>
-                </div>
+                        </div>
                 <div>
                   <div className="text-sm text-muted-foreground">WHIP</div>
                   <div className="text-xl font-semibold">{opposingTeam.startingPitcher.stats.whip}</div>
-                </div>
+                        </div>
                 <div>
                   <div className="text-sm text-muted-foreground">IP</div>
                   <div className="text-xl font-semibold">{opposingTeam.startingPitcher.stats.ip}</div>
-                </div>
-                <div>
+                    </div>
+                    <div>
                   <div className="text-sm text-muted-foreground">Record</div>
                   <div className="text-xl font-semibold">
                     {opposingTeam.startingPitcher.stats.wins}-{opposingTeam.startingPitcher.stats.losses}
-                  </div>
-                </div>
-              </div>
+                        </div>
+                      </div>
+                    </div>
               <div className="grid grid-cols-3 gap-4">
-                <div>
+                    <div>
                   <div className="text-sm text-muted-foreground">SO</div>
                   <div className="text-xl font-semibold">{opposingTeam.startingPitcher.stats.so}</div>
-                </div>
+                            </div>
                 <div>
                   <div className="text-sm text-muted-foreground">BB</div>
                   <div className="text-xl font-semibold">{opposingTeam.startingPitcher.stats.bb}</div>
-                </div>
-                <div>
+                    </div>
+                    <div>
                   <div className="text-sm text-muted-foreground">HR</div>
                   <div className="text-xl font-semibold">{opposingTeam.startingPitcher.stats.hr}</div>
-                </div>
-              </div>
-            </div>
+                          </div>
+                        </div>
+                      </div>
           ) : (
             <div className="text-center text-muted-foreground">
               No pitcher data available
             </div>
           )}
-        </Card>
+      </Card>
       </div>
     </div>
   )
