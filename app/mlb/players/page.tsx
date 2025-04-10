@@ -24,6 +24,7 @@ import statcastPitchers from "../../../Data/StatcastPitchers.json"
 import statcastBatters from "@/data/StatcastBatters.json"
 import hittersVsR from "../../../Data/HittersvR.json"
 import hittersVsL from "../../../Data/HittersvL.json"
+import pitchersVsR from "../../../Data/PitchersvR.json"
 
 interface StatcastPitcher {
   "last_name, first_name": string
@@ -88,6 +89,18 @@ interface HitterVsL {
   [key: string]: any  // Allow dynamic access for sorting
 }
 
+interface PitcherVsR {
+  Name_1: string
+  Team_1: string
+  HR: number
+  "HR/9": number
+  "FB%": number
+  "GB%": number
+  PlayerId: number
+  _year: number
+  [key: string]: any  // Allow dynamic access for sorting
+}
+
 type StatcastPlayer = StatcastPitcher | StatcastBatter
 
 type SortDirection = 'asc' | 'desc'
@@ -117,6 +130,15 @@ const HITTERS_VS_L_COLUMNS = [
   { key: "Pull%", label: "Pull%", width: "80px", format: (val: number) => (val * 100).toFixed(1) + '%' },
   { key: "HR/FB", label: "HR/FB", width: "80px", format: (val: number) => (val * 100).toFixed(1) + '%' },
   { key: "ISO", label: "ISO", width: "80px", format: (val: number) => val.toFixed(3) }
+]
+
+const PITCHERS_VS_R_COLUMNS = [
+  { key: "Name_1", label: "Name", width: "200px" },
+  { key: "Team_1", label: "Team", width: "80px" },
+  { key: "HR", label: "HR", width: "80px" },
+  { key: "HR/9", label: "HR/9", width: "80px", format: (val: number) => val.toFixed(2) },
+  { key: "FB%", label: "FB%", width: "80px", format: (val: number) => (val * 100).toFixed(1) + '%' },
+  { key: "GB%", label: "GB%", width: "80px", format: (val: number) => (val * 100).toFixed(1) + '%' }
 ]
 
 const BATTER_COLUMNS = [
@@ -167,7 +189,8 @@ const TABS = [
   { label: "Statcast Batters", value: "batters", dataset: "batters", columns: BATTER_COLUMNS },
   { label: "Statcast Pitchers", value: "pitchers", dataset: "pitchers", columns: PITCHER_COLUMNS },
   { label: "Hitters vs R", value: "hittersVsR", dataset: "hittersVsR", columns: HITTERS_VS_R_COLUMNS },
-  { label: "Hitters vs L", value: "hittersVsL", dataset: "hittersVsL", columns: HITTERS_VS_L_COLUMNS }
+  { label: "Hitters vs L", value: "hittersVsL", dataset: "hittersVsL", columns: HITTERS_VS_L_COLUMNS },
+  { label: "Pitchers vs R", value: "pitchersVsR", dataset: "pitchersVsR", columns: PITCHERS_VS_R_COLUMNS }
 ]
 
 const YEARS = ['2024', '2023', '2022']
@@ -176,7 +199,7 @@ const YEARS = ['2024', '2023', '2022']
 const pitchersData = statcastPitchers as StatcastPitcher[]
 const battersData = statcastBatters as StatcastBatter[]
 
-type DataType = StatcastPlayer | HitterVsR | HitterVsL
+type DataType = StatcastPlayer | HitterVsR | HitterVsL | PitcherVsR
 
 export default function PlayersPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -193,12 +216,14 @@ export default function PlayersPage() {
     ? pitchersData
     : selectedTab.dataset === 'hittersVsR'
     ? hittersVsR as HitterVsR[]
-    : hittersVsL as HitterVsL[]
+    : selectedTab.dataset === 'hittersVsL'
+    ? hittersVsL as HitterVsL[]
+    : pitchersVsR as PitcherVsR[]
 
   // Get unique teams from the current dataset
   const teams = ["All Teams", ...Array.from(new Set(baseData.map(player => {
-    if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL') {
-      return (player as HitterVsR | HitterVsL).Team_1
+    if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL' || selectedTab.dataset === 'pitchersVsR') {
+      return (player as HitterVsR | HitterVsL | PitcherVsR).Team_1
     }
     return (player as StatcastPlayer).team_name_alt
   }))).sort()]
@@ -211,11 +236,11 @@ export default function PlayersPage() {
 
   // Filter players based on search term, year, team, and pitch
   let filteredPlayers = baseData.filter(player => {
-    if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL') {
-      const hitter = player as HitterVsR | HitterVsL
-      const nameMatch = !searchTerm || hitter.Name_1?.toLowerCase().includes(searchTerm.toLowerCase())
-      const yearMatch = hitter._year?.toString() === selectedYear
-      const teamMatch = selectedTeam === "All Teams" || hitter.Team_1 === selectedTeam
+    if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL' || selectedTab.dataset === 'pitchersVsR') {
+      const vsPlayer = player as HitterVsR | HitterVsL | PitcherVsR
+      const nameMatch = !searchTerm || vsPlayer.Name_1?.toLowerCase().includes(searchTerm.toLowerCase())
+      const yearMatch = vsPlayer._year?.toString() === selectedYear
+      const teamMatch = selectedTeam === "All Teams" || vsPlayer.Team_1 === selectedTeam
       return nameMatch && yearMatch && teamMatch
     } else {
       const statcastPlayer = player as StatcastPlayer
@@ -232,9 +257,9 @@ export default function PlayersPage() {
     filteredPlayers.sort((a, b) => {
       let aValue: any, bValue: any
 
-      if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL') {
-        aValue = (a as HitterVsR | HitterVsL)[sortConfig.key as keyof HitterVsR | keyof HitterVsL]
-        bValue = (b as HitterVsR | HitterVsL)[sortConfig.key as keyof HitterVsR | keyof HitterVsL]
+      if (selectedTab.dataset === 'hittersVsR' || selectedTab.dataset === 'hittersVsL' || selectedTab.dataset === 'pitchersVsR') {
+        aValue = (a as HitterVsR | HitterVsL | PitcherVsR)[sortConfig.key as keyof HitterVsR | keyof HitterVsL | keyof PitcherVsR]
+        bValue = (b as HitterVsR | HitterVsL | PitcherVsR)[sortConfig.key as keyof HitterVsR | keyof HitterVsL | keyof PitcherVsR]
       } else {
         aValue = (a as StatcastPlayer)[sortConfig.key as keyof StatcastPlayer]
         bValue = (b as StatcastPlayer)[sortConfig.key as keyof StatcastPlayer]
@@ -311,24 +336,8 @@ export default function PlayersPage() {
     <div className="p-4">
       <Card>
         <div className="border-b border-border">
-          <div className="flex items-center justify-between p-4">
-            <div className="flex gap-4">
-              {TABS.map((tab) => (
-                <button
-                  key={tab.value}
-                  onClick={() => setSelectedTab(tab)}
-                  className={cn(
-                    "px-6 py-3 text-sm font-medium transition-colors hover:bg-muted/50 rounded-t-lg -mb-px",
-                    selectedTab.value === tab.value
-                      ? "border-2 border-b-0 border-border bg-background"
-                      : "border border-transparent"
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-6 p-4">
+            <div className="flex items-center justify-center gap-4">
               <Select
                 value={selectedYear}
                 onValueChange={setSelectedYear}
@@ -382,6 +391,22 @@ export default function PlayersPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+            </div>
+            <div className="flex gap-4">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.value}
+                  onClick={() => setSelectedTab(tab)}
+                  className={cn(
+                    "px-6 py-3 text-sm font-medium transition-colors hover:bg-muted/50 rounded-t-lg -mb-px",
+                    selectedTab.value === tab.value
+                      ? "border-2 border-b-0 border-border bg-background"
+                      : "border border-transparent"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
