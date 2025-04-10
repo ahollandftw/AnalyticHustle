@@ -45,6 +45,7 @@ const navItems = {
     { title: "Games", href: "/mlb/games", icon: Home },
     { title: "BvP", href: "/mlb/bvp", icon: BarChart3 },
     { title: "Daily Matchups", href: "/mlb/daily-matchups", icon: Calendar },
+    { title: "HR Projections", href: "/mlb/hr-projections", icon: TrendingUp },
     { title: "HR Live Odds", href: "/mlb/hr-live-odds", icon: Zap },
     { title: "Implied Totals", href: "/mlb/implied-totals", icon: TrendingUp },
     { title: "Park Factors", href: "/mlb/park-factors", icon: Stadium },
@@ -73,22 +74,11 @@ const communityItems = [
 ]
 
 const mlbLinks = [
-  {
-    title: "Games",
-    href: "/mlb/games",
-  },
-  {
-    title: "Park Factors",
-    href: "/mlb/park-factors",
-  },
-  {
-    title: "Player Stats",
-    href: "/mlb/player-stats",
-  },
-  {
-    title: "Team Stats",
-    href: "/mlb/team-stats",
-  },
+  { href: "/mlb/games", label: "Games" },
+  { href: "/mlb/lineups", label: "Lineups" },
+  { href: "/mlb/daily-matchups", label: "Daily Matchups" },
+  { href: "/mlb/hr-projections", label: "HR Projections" },
+  { href: "/mlb/park-factors", label: "Park Factors" },
 ]
 
 export function MainSidebar() {
