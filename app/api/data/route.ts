@@ -186,7 +186,9 @@ export async function GET(request: Request) {
     }
 
     if ((type === 'games' || type === 'lineups') && sport === 'mlb') {
+      console.log('Fetching MLB data...');
       const data = await fetchMLBLineups();
+      console.log('MLB data fetched:', JSON.stringify(data, null, 2));
       return NextResponse.json(data);
     }
 

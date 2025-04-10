@@ -1,23 +1,42 @@
 interface Player {
+  id: string;
   name: string;
   position: string;
-  battingOrder?: number;
-  stats?: {
+  bats: string;
+  stats: {
     avg: string;
+    obp: string;
+    slg: string;
+    ops: string;
     hr: number;
     rbi: number;
+    so: number;
+    bb: number;
+    pa: number;
   };
-  isProjected?: boolean;
+}
+
+interface Pitcher {
+  id: string;
+  name: string;
+  throws: string;
+  stats: {
+    era: string;
+    whip: string;
+    ip: number;
+    so: number;
+    bb: number;
+    hr: number;
+    wins: number;
+    losses: number;
+  };
 }
 
 interface Team {
+  id: string;
   name: string;
   lineup: Player[];
-  startingPitcher?: Player;
-  projectedLineup?: Player[];
-  score?: number;
-  record?: string;
-  moneyLine?: number;
+  startingPitcher: Pitcher | null;
 }
 
 interface Game {
@@ -53,7 +72,7 @@ export async function fetchMLBLineups(): Promise<Game[]> {
 
     // Fetch today's games
     const todayResponse = await fetch(
-      `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${formattedToday}&hydrate=probablePitcher,lineups,team,game(content(summary,media(epg))),linescore,weather,odds`
+      `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${formattedToday}&hydrate=probablePitcher(stats),lineups,team,game(content(summary,media(epg))),linescore,weather,odds`
     );
 
     if (!todayResponse.ok) {
@@ -87,18 +106,43 @@ export async function fetchMLBLineups(): Promise<Game[]> {
     });
 
     return todayGames.map((game: any) => {
-      const transformLineup = (players: any[] = [], isProjected = false) => {
+      const transformLineup = (players: any[] = []): Player[] => {
         return players.map(player => ({
-          name: player.fullName,
-          position: player.position?.abbreviation || '',
-          battingOrder: player.battingOrder,
+          id: player.id?.toString() || player.person?.id?.toString(),
+          name: player.fullName || player.person?.fullName || 'Unknown Player',
+          position: player.position?.abbreviation || player.position?.code || 'Unknown',
+          bats: player.batSide?.code || 'Unknown',
           stats: {
             avg: player.seasonStats?.batting?.avg || '.000',
+            obp: player.seasonStats?.batting?.obp || '.000',
+            slg: player.seasonStats?.batting?.slg || '.000',
+            ops: player.seasonStats?.batting?.ops || '.000',
             hr: player.seasonStats?.batting?.homeRuns || 0,
-            rbi: player.seasonStats?.batting?.rbi || 0
-          },
-          isProjected
+            rbi: player.seasonStats?.batting?.rbi || 0,
+            so: player.seasonStats?.batting?.strikeOuts || 0,
+            bb: player.seasonStats?.batting?.baseOnBalls || 0,
+            pa: player.seasonStats?.batting?.plateAppearances || 0
+          }
         }));
+      };
+
+      const transformPitcher = (pitcher: any): Pitcher | null => {
+        if (!pitcher) return null;
+        return {
+          id: pitcher.id?.toString(),
+          name: pitcher.fullName || 'Unknown Pitcher',
+          throws: pitcher.pitchHand?.code || 'Unknown',
+          stats: {
+            era: pitcher.stats?.pitching?.era || '0.00',
+            whip: pitcher.stats?.pitching?.whip || '0.00',
+            ip: pitcher.stats?.pitching?.inningsPitched || 0,
+            so: pitcher.stats?.pitching?.strikeOuts || 0,
+            bb: pitcher.stats?.pitching?.baseOnBalls || 0,
+            hr: pitcher.stats?.pitching?.homeRuns || 0,
+            wins: pitcher.stats?.pitching?.wins || 0,
+            losses: pitcher.stats?.pitching?.losses || 0
+          }
+        };
       };
 
       // Get confirmed or projected lineups for each team
@@ -110,77 +154,40 @@ export async function fetchMLBLineups(): Promise<Game[]> {
 
       // Check if today's lineups are available
       if (game.lineups?.awayPlayers && game.lineups.awayPlayers.length > 0) {
-        awayLineup = transformLineup(game.lineups.awayPlayers, false);
+        awayLineup = transformLineup(game.lineups.awayPlayers);
       } else {
         // Use yesterday's lineup as projection if available
         const yesterdayAwayLineup = teamLastLineups.get(awayTeamId);
         if (yesterdayAwayLineup) {
-          awayLineup = transformLineup(yesterdayAwayLineup, true);
+          awayLineup = transformLineup(yesterdayAwayLineup);
         }
       }
 
       if (game.lineups?.homePlayers && game.lineups.homePlayers.length > 0) {
-        homeLineup = transformLineup(game.lineups.homePlayers, false);
+        homeLineup = transformLineup(game.lineups.homePlayers);
       } else {
         // Use yesterday's lineup as projection if available
         const yesterdayHomeLineup = teamLastLineups.get(homeTeamId);
         if (yesterdayHomeLineup) {
-          homeLineup = transformLineup(yesterdayHomeLineup, true);
+          homeLineup = transformLineup(yesterdayHomeLineup);
         }
       }
 
-      const awayTeam = {
-        name: game.teams.away.team.name,
-        record: `${game.teams.away.leagueRecord?.wins || 0}-${game.teams.away.leagueRecord?.losses || 0}`,
-        moneyLine: game.teams.away.odds?.moneyLine,
-        startingPitcher: game.teams.away.probablePitcher ? {
-          name: game.teams.away.probablePitcher.fullName,
-          position: 'P',
-          stats: {
-            avg: '.000',
-            hr: 0,
-            rbi: 0
-          }
-        } : undefined,
-        lineup: awayLineup,
-        score: game.linescore?.teams?.away?.runs
-      };
-
-      const homeTeam = {
-        name: game.teams.home.team.name,
-        record: `${game.teams.home.leagueRecord?.wins || 0}-${game.teams.home.leagueRecord?.losses || 0}`,
-        moneyLine: game.teams.home.odds?.moneyLine,
-        startingPitcher: game.teams.home.probablePitcher ? {
-          name: game.teams.home.probablePitcher.fullName,
-          position: 'P',
-          stats: {
-            avg: '.000',
-            hr: 0,
-            rbi: 0
-          }
-        } : undefined,
-        lineup: homeLineup,
-        score: game.linescore?.teams?.home?.runs
-      };
-
       return {
         id: game.gamePk.toString(),
-        status: game.status.abstractGameState,
         startTime: game.gameDate,
-        inning: game.linescore?.currentInning,
-        isTopInning: game.linescore?.isTopInning,
-        awayTeam,
-        homeTeam,
-        weather: game.weather ? {
-          temperature: game.weather.temp,
-          condition: game.weather.condition,
-          windSpeed: game.weather.wind,
-          windDirection: game.weather.windDirection
-        } : undefined,
-        odds: game.odds ? {
-          spread: `${game.odds.overUnder}`,
-          total: parseFloat(game.odds.overUnder)
-        } : undefined
+        awayTeam: {
+          id: awayTeamId.toString(),
+          name: game.teams.away.team.name,
+          lineup: awayLineup,
+          startingPitcher: transformPitcher(game.teams.away.probablePitcher)
+        },
+        homeTeam: {
+          id: homeTeamId.toString(),
+          name: game.teams.home.team.name,
+          lineup: homeLineup,
+          startingPitcher: transformPitcher(game.teams.home.probablePitcher)
+        }
       };
     });
   } catch (error) {
