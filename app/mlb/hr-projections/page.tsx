@@ -75,6 +75,8 @@ interface Player {
   opposingPitcher?: string;
   opposingPitcherThrows?: string;
   homeGame?: boolean;
+  seasonHR?: number;
+  hrPerAB?: number;
 }
 
 interface Team {
@@ -89,6 +91,18 @@ interface Game {
   startTime: string;
   awayTeam: Team;
   homeTeam: Team;
+}
+
+interface TeamStats {
+  team: {
+    name: string;
+    id: string;
+  };
+  players: {
+    name: string;
+    seasonHR: number;
+    abhr: number;
+  }[];
 }
 
 function getHitterStats(name: string, bats: string, pitcherThrows: string) {
@@ -267,16 +281,10 @@ async function calculateHRProbability(
 }
 
 export default function HRProjectionsPage() {
-  const { data: games, loading, error } = useData<Game[]>({ 
-    type: "games",
-    sport: "mlb"
-  })
-
-  const [battersWithProbabilities, setBattersWithProbabilities] = useState<(Player & { probability: number })[]>([])
-  const [sortConfig, setSortConfig] = useState<{ key: 'probability' | 'hr', direction: 'asc' | 'desc' }>({
-    key: 'probability',
-    direction: 'desc'
-  })
+  const { data: games, error } = useData<Game[]>({ type: 'games', sport: 'mlb' })
+  const [sortedData, setSortedData] = useState<(Player & { probability: number })[]>([])
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'probability', direction: 'desc' })
+  const [loading, setLoading] = useState(true)
 
   const sortData = (data: (Player & { probability: number })[], key: 'probability' | 'hr', direction: 'asc' | 'desc') => {
     return [...data].sort((a, b) => {
@@ -286,62 +294,69 @@ export default function HRProjectionsPage() {
     })
   }
 
-  const handleSort = (key: 'probability' | 'hr') => {
-    setSortConfig(current => {
-      if (current.key === key) {
-        return {
-          key,
-          direction: current.direction === 'asc' ? 'desc' : 'asc'
-        }
-      }
-      return { key, direction: 'desc' }
-    })
+  const handleSort = (key: string) => {
+    setSortConfig(current => ({
+      ...current,
+      key,
+      direction: current.direction === 'asc' ? 'desc' : 'asc'
+    }))
   }
 
   useEffect(() => {
     async function calculateProbabilities() {
       if (!games) return
 
-      // Get all batters from all teams with their matchups
-      const allBatters = games.flatMap(game => [
-        ...game.homeTeam.lineup.map(player => ({
-          ...player,
-          team: game.homeTeam.name,
-          opposingTeam: game.awayTeam.name,
-          opposingPitcher: game.awayTeam.startingPitcher?.name || 'TBD',
-          opposingPitcherThrows: game.awayTeam.startingPitcher?.throws || 'R',
-          homeGame: true
-        })),
-        ...game.awayTeam.lineup.map(player => ({
-          ...player,
-          team: game.awayTeam.name,
-          opposingTeam: game.homeTeam.name,
-          opposingPitcher: game.homeTeam.startingPitcher?.name || 'TBD',
-          opposingPitcherThrows: game.homeTeam.startingPitcher?.throws || 'R',
-          homeGame: false
-        }))
-      ])
+      const allPlayers: (Player & { probability: number })[] = []
 
-      // Calculate HR probabilities for each batter
-      const batterPromises = allBatters.map(async batter => {
-        const hitterStats = getHitterStats(batter.name, batter.bats, batter.opposingPitcherThrows)
-        const pitcherStats = getPitcherStats(batter.opposingPitcher, batter.bats)
-        const parkFactor = getParkFactor(batter.homeGame ? batter.team : batter.opposingTeam)
-
-        let probability = 0
-        if (hitterStats && pitcherStats) {
-          probability = await calculateHRProbability(hitterStats, pitcherStats, parkFactor)
+      for (const game of games) {
+        const processTeam = async (team: Team, isHome: boolean) => {
+          const opposingTeam = isHome ? game.awayTeam : game.homeTeam
+          
+          for (const player of team.lineup) {
+            try {
+              const statsResponse = await fetch(`/api/mlb/team-stats?teamId=${team.id}`)
+              const statsData = await statsResponse.json() as TeamStats
+              const playerStats = statsData.players?.find((p: { name: string }) => p.name === player.name)
+              
+              const hitterStats = getHitterStats(
+                player.name,
+                player.bats,
+                opposingTeam.startingPitcher?.throws || 'R'
+              )
+              
+              const pitcherStats = getPitcherStats(
+                opposingTeam.startingPitcher?.name || 'TBD',
+                player.bats
+              )
+              
+              const parkFactor = getParkFactor(isHome ? team.name : opposingTeam.name)
+              const probability = await calculateHRProbability(hitterStats, pitcherStats, parkFactor)
+              
+              allPlayers.push({
+                ...player,
+                team: team.name,
+                opposingTeam: opposingTeam.name,
+                opposingPitcher: opposingTeam.startingPitcher?.name || 'TBD',
+                opposingPitcherThrows: opposingTeam.startingPitcher?.throws || 'R',
+                homeGame: isHome,
+                probability,
+                seasonHR: playerStats?.seasonHR || 0,
+                hrPerAB: playerStats?.abhr || 0
+              })
+            } catch (error) {
+              console.error('Error fetching player stats:', error)
+            }
+          }
         }
 
-        return {
-          ...batter,
-          probability
-        }
-      })
+        await Promise.all([
+          processTeam(game.homeTeam, true),
+          processTeam(game.awayTeam, false)
+        ])
+      }
 
-      const completedBatters = await Promise.all(batterPromises)
-      const sortedBatters = sortData(completedBatters, sortConfig.key, sortConfig.direction)
-      setBattersWithProbabilities(sortedBatters)
+      setSortedData(sortData(allPlayers, sortConfig.key as 'probability' | 'hr', sortConfig.direction))
+      setLoading(false)
     }
 
     calculateProbabilities()
@@ -353,59 +368,44 @@ export default function HRProjectionsPage() {
     )
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-[600px]" />
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-4">
-      <Card className="p-4">
-        <h2 className="mb-4 text-lg font-semibold">Today's HR Projections</h2>
-        <Table>
-          <TableHeader>
+    <Card className="w-full">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Team</TableHead>
+            <TableHead>vs Pitcher</TableHead>
+            <TableHead className="text-right">
+              <Button variant="ghost" onClick={() => handleSort('probability')}>
+                HR Prob {sortConfig.key === 'probability' && <ArrowUpDown className="ml-2 h-4 w-4" />}
+              </Button>
+            </TableHead>
+            <TableHead className="text-right">Season HR</TableHead>
+            <TableHead className="text-right">HR/AB</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {loading ? (
             <TableRow>
-              <TableHead className="text-center">Name</TableHead>
-              <TableHead className="text-center">Team</TableHead>
-              <TableHead className="text-center">vs Pitcher</TableHead>
-              <TableHead className="text-center">
-                <Button
-                  variant="ghost"
-                  onClick={() => handleSort('probability')}
-                  className="w-full"
-                >
-                  HR Prob
-                  <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead className="text-center">
-                <Button
-                  variant="ghost"
-                  onClick={() => handleSort('hr')}
-                  className="w-full"
-                >
-                  Season HR
-                  <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-              </TableHead>
+              <TableCell colSpan={6}>
+                <Skeleton className="h-4 w-full" />
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {battersWithProbabilities.map((player) => (
-              <TableRow key={`${player.id}-${player.team}`}>
-                <TableCell className="text-center">{player.name}</TableCell>
-                <TableCell className="text-center">{player.team}</TableCell>
-                <TableCell className="text-center">{player.opposingPitcher}</TableCell>
-                <TableCell className="text-center">{(player.probability * 100).toFixed(1)}%</TableCell>
-                <TableCell className="text-center">{player.stats.hr}</TableCell>
+          ) : (
+            sortedData.map((player) => (
+              <TableRow key={`${player.name}-${player.team}`}>
+                <TableCell>{player.name}</TableCell>
+                <TableCell>{player.team}</TableCell>
+                <TableCell>{player.opposingPitcher}</TableCell>
+                <TableCell className="text-right">{(player.probability * 100).toFixed(1)}%</TableCell>
+                <TableCell className="text-right">{player.seasonHR}</TableCell>
+                <TableCell className="text-right">{player.hrPerAB}</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Card>
-    </div>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </Card>
   )
 } 
