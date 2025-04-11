@@ -129,18 +129,18 @@ function getHitterStats(name: string, bats: string, pitcherThrows: string) {
         hr_per_fb: alternateHitterData["HR/FB"],
         fb_percent: alternateHitterData["FB%"],
         pull_percent: alternateHitterData["Pull%"],
-        hard_hit: statcastData?.hard_hit_percent ?? 35, // League average fallback
-        barrel_rate: evData?.brl_pa ?? 7 // League average fallback
+        hard_hit: statcastData?.hard_hit_percent ?? 30, // League average fallback
+        barrel_rate: evData?.brl_pa ?? 5 // League average fallback
       }
     }
     
-    // If still no data, use league averages
+    // If still no data, use league averages with slightly higher baseline
     console.log('Using league averages for hitter:', name)
     return {
       hr_per_pa: 0.035, // League average ~3.5% HR/PA
-      hr_per_fb: 0.15,  // League average ~15% HR/FB
-      fb_percent: 0.35, // League average ~35% FB
-      pull_percent: 0.40, // League average ~40% Pull
+      hr_per_fb: 0.12, // League average ~12% HR/FB
+      fb_percent: 0.38, // League average ~38% FB
+      pull_percent: 0.42, // League average ~42% Pull
       hard_hit: 35, // League average ~35%
       barrel_rate: 7 // League average ~7%
     }
@@ -151,8 +151,8 @@ function getHitterStats(name: string, bats: string, pitcherThrows: string) {
     hr_per_fb: hitterData["HR/FB"],
     fb_percent: hitterData["FB%"],
     pull_percent: hitterData["Pull%"],
-    hard_hit: statcastData?.hard_hit_percent ?? 35,
-    barrel_rate: evData?.brl_pa ?? 7
+    hard_hit: statcastData?.hard_hit_percent ?? 30,
+    barrel_rate: evData?.brl_pa ?? 5
   }
 }
 
@@ -160,9 +160,9 @@ function getPitcherStats(name: string, batterHand: string) {
   if (name === 'TBD') {
     console.log('Using league averages for TBD pitcher')
     return {
-      hr_per_9: 1.2,  // League average HR/9
-      fb_percent: 0.35, // League average FB%
-      gb_percent: 0.43, // League average GB%
+      hr_per_9: 1.3, // League average HR/9
+      fb_percent: 0.38, // League average FB%
+      gb_percent: 0.42, // League average GB%
       hard_hit: 35, // League average hard hit%
       barrel_rate: 7 // League average barrel rate
     }
@@ -204,17 +204,17 @@ function getPitcherStats(name: string, batterHand: string) {
         hr_per_9: alternatePitcherData["HR/9"],
         fb_percent: alternatePitcherData["FB%"],
         gb_percent: alternatePitcherData["GB%"],
-        hard_hit: statcastData?.hard_hit_percent ?? 35,
-        barrel_rate: evData?.brl_pa ?? 7
+        hard_hit: statcastData?.hard_hit_percent ?? 30,
+        barrel_rate: evData?.brl_pa ?? 5
       }
     }
 
     // If still no data, use league averages
     console.log('Using league averages for pitcher:', name)
     return {
-      hr_per_9: 1.2,
-      fb_percent: 0.35,
-      gb_percent: 0.43,
+      hr_per_9: 1.3,
+      fb_percent: 0.38,
+      gb_percent: 0.42,
       hard_hit: 35,
       barrel_rate: 7
     }
@@ -224,8 +224,8 @@ function getPitcherStats(name: string, batterHand: string) {
     hr_per_9: pitcherData["HR/9"],
     fb_percent: pitcherData["FB%"],
     gb_percent: pitcherData["GB%"],
-    hard_hit: statcastData?.hard_hit_percent ?? 35,
-    barrel_rate: evData?.brl_pa ?? 7
+    hard_hit: statcastData?.hard_hit_percent ?? 30,
+    barrel_rate: evData?.brl_pa ?? 5
   }
 }
 
@@ -239,22 +239,31 @@ async function calculateHRProbability(
   pitcherStats: any,
   parkFactor: number
 ) {
-  // Base HR rate from historical data (convert HR/PA to a percentage)
-  const baseHRRate = hitterStats.hr_per_pa * 100 // Convert to percentage
-
-  // Adjust for pitcher quality (HR/9 where league average is 1.2)
-  const pitcherAdjustment = (pitcherStats.hr_per_9 / 1.2)
+  // Base HR rate from historical data (convert HR/9 to HR/PA)
+  const pitcherHRperPA = (pitcherStats.hr_per_9 / 9) * 0.11 // Approx 11% of PA end in HR for HR-prone pitchers
+  const baseHRRate = Math.max(hitterStats.hr_per_pa, pitcherHRperPA) || 0.03
 
   // Adjust for matchup factors
-  const fbAdjustment = Math.min(2.0, (hitterStats.fb_percent * pitcherStats.fb_percent) / 0.1225) // 0.35 * 0.35 = 0.1225
-  const pullAdjustment = hitterStats.pull_percent > 0.45 ? 1.2 : 1.0 // Bigger boost for pull hitters
-  const hardHitAdjustment = Math.min(2.0, ((hitterStats.hard_hit + pitcherStats.hard_hit) / 2) / 30) // Normalize to league average
-  
-  // Combine all factors
-  let adjustedRate = (baseHRRate * pitcherAdjustment * fbAdjustment * pullAdjustment * hardHitAdjustment * parkFactor)
+  const fbAdjustment = Math.min(
+    (hitterStats.fb_percent * (1 - pitcherStats.gb_percent)) / 0.35, 
+    1.5
+  ) // Cap flyball adjustment
 
-  // Cap the probability at reasonable limits (between 2% and 35% per PA)
-  return Math.min(Math.max(adjustedRate / 100, 0.02), 0.35)
+  // Pull and hard hit bonuses
+  const pullBonus = hitterStats.pull_percent > 0.45 ? 1.2 : 1.0
+  const hardHitBonus = ((hitterStats.hard_hit + pitcherStats.hard_hit) / 2) > 35 ? 1.2 : 1.0
+  
+  // Barrel rate impact (significant factor in HR probability)
+  const barrelBonus = ((hitterStats.barrel_rate + 5) / 5)
+
+  // Combine all factors
+  let adjustedRate = baseHRRate * fbAdjustment * pullBonus * hardHitBonus * barrelBonus * parkFactor
+
+  // Scale up the final probability to better reflect real-world HR rates
+  adjustedRate = adjustedRate * 1.5
+
+  // Only keep the minimum floor to ensure realistic probabilities
+  return Math.max(adjustedRate, 0.02)
 }
 
 export default function HRProjectionsPage() {

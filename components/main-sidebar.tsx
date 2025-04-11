@@ -45,6 +45,7 @@ const navItems = {
     { title: "Games", href: "/mlb/games", icon: Home },
     { title: "BvP", href: "/mlb/bvp", icon: BarChart3 },
     { title: "Daily Matchups", href: "/mlb/daily-matchups", icon: Calendar },
+    { title: "HR Odds", href: "/mlb/hr-odds", icon: TrendingUp },
     { title: "HR Projections", href: "/mlb/hr-projections", icon: TrendingUp },
     { title: "HR Live Odds", href: "/mlb/hr-live-odds", icon: Zap },
     { title: "HR Calculator", href: "/mlb/hr-calculator", icon: PieChart },
