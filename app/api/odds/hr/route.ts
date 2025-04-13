@@ -1,234 +1,73 @@
 import { NextResponse } from 'next/server'
 import { fetchMLBLineups } from '@/lib/mlb'
+import statcastBatters from "C:/AnalyticHustle1.0/StatcastBatters.json"
+import hittersVsR from "C:/AnalyticHustle1.0/HittersvR.json"
+import hittersVsL from "C:/AnalyticHustle1.0/HittersvL.json"
 
-interface Player {
+interface PlayerOdds {
   name: string;
-  stats: {
-    hr: number;
-    pa: number;
-  };
-}
-
-interface Team {
-  name: string;
-  lineup: Player[];
-}
-
-interface Game {
-  startTime: string;
-  homeTeam: Team;
-  awayTeam: Team;
-}
-
-const SPORTSRADAR_API_KEY = process.env.SPORTSRADAR_API_KEY
-
-// For testing purposes, if no API key is available
-const MOCK_ODDS_DATA = {
-  competition_sport_events_players_props: [
-    {
-      players_props: [
-        {
-          markets: [
-            {
-              name: "Home Runs",
-              books: [
-                {
-                  name: "DraftKings",
-                  outcomes: [
-                    {
-                      player_name: "Aaron Judge",
-                      odds_american: "+320"
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    }
-  ]
+  team: string;
+  seasonHR: number;
+  abhr: number;
+  probability: number;
 }
 
 export async function GET() {
   try {
-    // Debug: Log API key status
-    console.log('API Key status:', SPORTSRADAR_API_KEY ? 'Present' : 'Missing')
-    
-    // First get today's games and lineups
-    console.log('Fetching MLB lineups...')
+    // Get current games and lineups
     const games = await fetchMLBLineups()
-    
-    if (!games || !Array.isArray(games) || games.length === 0) {
-      console.log('No games available today')
-      return NextResponse.json([])
-    }
-    console.log(`Found ${games.length} games`)
-
-    // If no API key, use mock data for testing
-    if (!SPORTSRADAR_API_KEY) {
-      console.log('Using mock odds data (no API key provided)')
-      const oddsData = MOCK_ODDS_DATA
-      return processOddsData(games, oddsData)
+    if (!games || !Array.isArray(games)) {
+      return NextResponse.json(
+        { error: 'Failed to fetch current lineups' },
+        { status: 500 }
+      )
     }
 
-    // Fetch odds from SportsRadar
-    console.log('Fetching odds from SportsRadar...')
-    const apiUrl = 'https://api.sportradar.com/oddscomparison-player-props/trial/v2/en/competitions/sr:competition:17/players_props?offset=0&limit=100'
-    console.log('API URL:', apiUrl)
+    const allPlayers: PlayerOdds[] = []
     
-    const headers = {
-      'api-key': SPORTSRADAR_API_KEY
-    }
-    console.log('Request headers:', headers)
+    // Process each game to find players
+    for (const game of games) {
+      const processTeam = (team: any) => {
+        for (const player of team.lineup) {
+          // Find player in Statcast data
+          const statcastData = statcastBatters.find((p: any) => 
+            p.player_name.toLowerCase() === player.name.toLowerCase()
+          )
 
-    const oddsResponse = await fetch(apiUrl, { headers })
-
-    // Debug: Log response details
-    console.log('Response status:', oddsResponse.status)
-    console.log('Response status text:', oddsResponse.statusText)
-    
-    if (!oddsResponse.ok) {
-      console.error(`SportsRadar API error: ${oddsResponse.status} ${oddsResponse.statusText}`)
-      // Try to get more error details
-      const errorText = await oddsResponse.text()
-      console.error('Error response body:', errorText)
-      return NextResponse.json([])
-    }
-
-    const oddsData = await oddsResponse.json()
-    console.log('Received odds data structure:', JSON.stringify(oddsData, null, 2).substring(0, 500) + '...')
-    
-    return processOddsData(games, oddsData)
-    
-  } catch (error) {
-    console.error('Error in HR odds API route:', error)
-    return NextResponse.json([], { status: 200 })
-  }
-}
-
-function processOddsData(games: Game[], oddsData: any) {
-  try {
-    // Process each game and combine lineup data with odds
-    const playersWithOdds = games.flatMap(game => {
-      if (!game.homeTeam?.name || !game.awayTeam?.name) {
-        console.warn('Game missing team information:', game)
-        return []
+          // Find player in platoon splits
+          const vsRData = hittersVsR.find((p: any) => 
+            p.Name_1.toLowerCase() === player.name.toLowerCase()
+          )
+          const vsLData = hittersVsL.find((p: any) => 
+            p.Name_1.toLowerCase() === player.name.toLowerCase()
+          )
+          
+          if (statcastData || vsRData || vsLData) {
+            const seasonHR = (vsRData?.HR || 0) + (vsLData?.HR || 0)
+            const totalPA = (vsRData?.PA || 0) + (vsLData?.PA || 0)
+            
+            allPlayers.push({
+              name: player.name,
+              team: team.name,
+              seasonHR: seasonHR,
+              abhr: totalPA > 0 ? Math.round(totalPA / (seasonHR || 1)) : 0,
+              probability: player.stats.hr // Using current HR probability from projections
+            })
+          }
+        }
       }
 
-      // Process home team players
-      const homePlayers = (game.homeTeam.lineup || []).map((player: Player) => {
-        if (!player?.name) return null
-        
-        // Find player's odds across all events
-        let bestOdds: any = null
-        let bestBookmaker = 'Unknown'
+      processTeam(game.homeTeam)
+      processTeam(game.awayTeam)
+    }
 
-        // Search through all events for this player's odds
-        oddsData.competition_sport_events_players_props?.forEach((event: any) => {
-          event.players_props?.forEach((prop: any) => {
-            prop.markets?.forEach((market: any) => {
-              if (market.name?.toLowerCase().includes('home run')) {
-                market.books?.forEach((book: any) => {
-                  book.outcomes?.forEach((outcome: any) => {
-                    if (outcome.player_name?.toLowerCase() === player.name.toLowerCase()) {
-                      const americanOdds = parseInt(outcome.odds_american || '0')
-                      if (!bestOdds || americanOdds > parseInt(bestOdds)) {
-                        bestOdds = outcome.odds_american
-                        bestBookmaker = book.name
-                      }
-                    }
-                  })
-                })
-              }
-            })
-          })
-        })
+    return NextResponse.json(allPlayers)
 
-        if (!bestOdds) {
-          console.warn(`No odds found for player: ${player.name}`)
-          return null
-        }
-
-        return {
-          name: player.name,
-          team: game.homeTeam.name,
-          game: `${game.awayTeam.name} @ ${game.homeTeam.name}`,
-          time: new Date(game.startTime).toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            timeZone: 'America/New_York'
-          }) + ' ET',
-          odds: bestOdds,
-          bookmaker: bestBookmaker,
-          season: {
-            hr: player.stats?.hr ?? 0,
-            pa: player.stats?.pa ?? 0,
-            hrRate: ((player.stats?.hr ?? 0) / (player.stats?.pa ?? 1) * 100).toFixed(1) + '%'
-          }
-        }
-      }).filter(Boolean)
-
-      // Process away team players
-      const awayPlayers = (game.awayTeam.lineup || []).map((player: Player) => {
-        if (!player?.name) return null
-        
-        // Find player's odds across all events
-        let bestOdds: any = null
-        let bestBookmaker = 'Unknown'
-
-        // Search through all events for this player's odds
-        oddsData.competition_sport_events_players_props?.forEach((event: any) => {
-          event.players_props?.forEach((prop: any) => {
-            prop.markets?.forEach((market: any) => {
-              if (market.name?.toLowerCase().includes('home run')) {
-                market.books?.forEach((book: any) => {
-                  book.outcomes?.forEach((outcome: any) => {
-                    if (outcome.player_name?.toLowerCase() === player.name.toLowerCase()) {
-                      const americanOdds = parseInt(outcome.odds_american || '0')
-                      if (!bestOdds || americanOdds > parseInt(bestOdds)) {
-                        bestOdds = outcome.odds_american
-                        bestBookmaker = book.name
-                      }
-                    }
-                  })
-                })
-              }
-            })
-          })
-        })
-
-        if (!bestOdds) {
-          console.warn(`No odds found for player: ${player.name}`)
-          return null
-        }
-
-        return {
-          name: player.name,
-          team: game.awayTeam.name,
-          game: `${game.awayTeam.name} @ ${game.homeTeam.name}`,
-          time: new Date(game.startTime).toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            timeZone: 'America/New_York'
-          }) + ' ET',
-          odds: bestOdds,
-          bookmaker: bestBookmaker,
-          season: {
-            hr: player.stats?.hr ?? 0,
-            pa: player.stats?.pa ?? 0,
-            hrRate: ((player.stats?.hr ?? 0) / (player.stats?.pa ?? 1) * 100).toFixed(1) + '%'
-          }
-        }
-      }).filter(Boolean)
-
-      return [...homePlayers, ...awayPlayers]
-    })
-
-    console.log(`Successfully processed odds for ${playersWithOdds.length} players`)
-    return NextResponse.json(playersWithOdds)
   } catch (error) {
-    console.error('Error processing odds data:', error)
-    return NextResponse.json([], { status: 200 }) // Return empty array instead of error
+    console.error('Error fetching HR odds:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 } 

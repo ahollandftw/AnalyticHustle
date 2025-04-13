@@ -40,20 +40,21 @@ const defaultWeights: Weights = {
 
 interface WeightSlidersProps {
   onWeightsChange: (weights: Weights) => void;
+  currentWeights: Weights;
+  isPreset: boolean;
 }
 
-const WeightSliders: React.FC<WeightSlidersProps> = ({ onWeightsChange }) => {
-  const [weights, setWeights] = useState<Weights>(defaultWeights);
+const WeightSliders: React.FC<WeightSlidersProps> = ({ 
+  onWeightsChange, 
+  currentWeights,
+  isPreset 
+}) => {
+  const weights = currentWeights;
 
   const updateWeight = (key: keyof Weights, value: number) => {
     const updated = { ...weights, [key]: value };
-    setWeights(updated);
     onWeightsChange(updated);
   };
-
-  useEffect(() => {
-    onWeightsChange(weights);
-  }, []); // send initial values once
 
   return (
     <div>
@@ -69,6 +70,7 @@ const WeightSliders: React.FC<WeightSlidersProps> = ({ onWeightsChange }) => {
             value={weights[key]}
             onChange={(e) => updateWeight(key, parseFloat(e.target.value))}
             className="w-full"
+            disabled={isPreset}
           />
         </div>
       ))}

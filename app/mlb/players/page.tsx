@@ -21,13 +21,13 @@ import {
 import { cn } from "@/lib/utils"
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import statcastPitchers from "../../../Data/StatcastPitchers.json"
-import statcastBatters from "@/data/StatcastBatters.json"
+import statcastBatters from "C:/AnalyticHustle1.0/StatcastBatters.json"
 import hittersVsR from "../../../Data/HittersvR.json"
 import hittersVsL from "../../../Data/HittersvL.json"
 import pitchersVsR from "../../../Data/PitchersvR.json"
 import pitchersVsL from "../../../Data/PitchersvL.json"
-import evBatters from "@/Data/EVBatters.json"
-import evPitchers from "@/Data/EVPitchers.json"
+import evBatters from "C:/AnalyticHustle1.0/EVBatters.json"
+import evPitchers from "C:/AnalyticHustle1.0/EVPitchers.json"
 
 interface StatcastPitcher {
   "last_name, first_name": string
@@ -297,6 +297,7 @@ export default function PlayersPage() {
   const [selectedYear, setSelectedYear] = useState(YEARS[0])
   const [selectedPitch, setSelectedPitch] = useState<string>("All Pitches")
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: 'asc' })
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('')
 
   // Get the appropriate dataset based on selected tab
   const baseData = selectedTab.dataset === 'batters' 

@@ -72,7 +72,7 @@ export async function fetchMLBLineups(): Promise<Game[]> {
 
     // Fetch today's games
     const todayResponse = await fetch(
-      `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${formattedToday}&hydrate=probablePitcher(stats),lineups,team,game(content(summary,media(epg))),linescore,weather,odds`
+      `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${formattedToday}&gameTypes=R,D&hydrate=probablePitcher(stats),lineups,team,game(content(summary,media(epg))),linescore,weather,odds`
     );
 
     if (!todayResponse.ok) {
@@ -84,7 +84,7 @@ export async function fetchMLBLineups(): Promise<Game[]> {
 
     // Fetch yesterday's games for projected lineups
     const yesterdayResponse = await fetch(
-      `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${formattedYesterday}&hydrate=lineups,team`
+      `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${formattedYesterday}&gameTypes=R,D&hydrate=lineups,team`
     );
 
     if (!yesterdayResponse.ok) {

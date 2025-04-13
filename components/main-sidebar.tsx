@@ -52,6 +52,7 @@ const navItems = {
     { title: "Implied Totals", href: "/mlb/implied-totals", icon: TrendingUp },
     { title: "Park Factors", href: "/mlb/park-factors", icon: Stadium },
     { title: "Players", href: "/mlb/players", icon: Users },
+    { title: "Slip Maker", href: "/mlb/slip-maker", icon: Wallet },
   ],
   nba: [
     { title: "Games", href: "/nba/games", icon: Home },
